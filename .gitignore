@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode / Swift
+.build/
+DerivedData/
+.swiftpm/
+Packages/
+*.xcworkspace
+xcuserdata/
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcuserdata/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+# Test and tooling artifacts
+*.log
+*.tmp
+coverage/
+result.bundle/
+
+# Editors
+.vscode/
+.idea/
+
+# Environment files
+.env
+.env.*
