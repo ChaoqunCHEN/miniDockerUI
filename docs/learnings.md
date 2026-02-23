@@ -57,3 +57,14 @@
 3. Testing keychain logic via an `InMemoryKeychainStore` mock is essential because `SecItem*` APIs require keychain entitlements that are not available in sandboxed test runners or CI environments.
 4. `JSONSettingsStore.save` creating parent directories with `withIntermediateDirectories: true` prevents first-launch failures when the settings directory does not yet exist.
 5. Using `Data.write(to:options:.atomic)` for settings persistence prevents partial-write corruption on crash.
+
+## 2026-02-22 (Wave 2: CLI parsers, log buffer, worktree validation)
+1. Docker `ps --format json` outputs NDJSON (one JSON object per line), not a JSON array. Using `JSONSerialization` per line is simpler than trying to decode the entire output as a single document.
+2. Docker's `Status` field embeds health status in parentheses (e.g. "Up 2 hours (healthy)"). Extracting health by parsing the last parenthesized segment is more robust than pattern-matching the full status string.
+3. Docker's label format in `docker ps --format json` is comma-separated `key=value` pairs where values can contain `=`. Always split on the first `=` per pair.
+4. For RFC3339Nano timestamps, Foundation's `ISO8601DateFormatter` only supports millisecond precision. Manual extraction of the fractional part (up to 9 digits) with `addingTimeInterval()` preserves nanosecond precision without external dependencies.
+5. `OSAllocatedUnfairLock` works well for the ring buffer pattern: take the lock for the minimum duration (read/mutate the dictionary entry), release before any user callbacks or allocations.
+6. When implementing a ring buffer with both line and byte caps, eviction must loop (evicting oldest repeatedly) until **both** constraints are satisfied, since a single large entry might require evicting multiple smaller ones.
+7. Worktree validation should be a pure function layer with no filesystem access — this makes it trivially testable and separates validation from execution. The planner takes `runningContainerIds` as a parameter rather than querying Docker.
+8. Path normalization (stripping trailing `/`) must be applied consistently across all path comparisons. Using a shared `normalizePath()` helper prevents subtle prefix-matching bugs.
+9. Separating `WorktreeValidationError` from `CoreError` provides granular per-field validation feedback suitable for UI display without polluting the command/protocol error taxonomy.

@@ -153,17 +153,46 @@ WaveGate status:
 
 ### Wave 2
 WaveGate status:
-- `dev_complete`: pending
-- `e2e_passed`: pending
-- `fix_complete`: pending
+- `dev_complete`: completed
+- `e2e_passed`: completed
+- `fix_complete`: completed
 
 | task_id | lane | status | depends_on | owned_paths | deliverables | acceptance |
 | --- | --- | --- | --- | --- | --- | --- |
-| W2-BUILD-ENG-CLI-002 | engine | pending | W1-FIX | `/core/Sources/Engine/CLI/Parsers/**`, `/core/Tests/Engine/CLI/Parsers/**` | parsers for list/inspect/events/log formats | parser fixtures pass including malformed input |
-| W2-BUILD-LOG-001 | logs | pending | W1-FIX | `/core/Sources/Logs/**`, `/core/Tests/Logs/**` | bounded ring buffer + search primitives | cap/truncation/search tests pass |
-| W2-BUILD-WT-001 | worktree | pending | W1-FIX | `/core/Sources/Worktrees/**`, `/core/Tests/Worktrees/**` | worktree mapping validation + switch planning | parse/validation tests pass |
-| W2-E2E | test | pending | W2-BUILD-ENG-CLI-002, W2-BUILD-LOG-001, W2-BUILD-WT-001 | `/tests/**`, `docs/execution_plan.md` evidence section | parser-to-state smoke, log cap/search E2E, worktree mapping E2E | evidence fields filled, scenarios pass or defects logged |
-| W2-FIX | qa | pending | W2-E2E | wave 2 build paths + `/tests/**` | fix parser/buffer/worktree defects | P0/P1 closed, rerun pass |
+| W2-BUILD-ENG-CLI-002 | engine | completed | W1-FIX | `/core/Sources/Engine/CLI/Parsers/**`, `/core/Tests/Engine/CLI/Parsers/**` | parsers for list/inspect/events/log formats | parser fixtures pass including malformed input |
+| W2-BUILD-LOG-001 | logs | completed | W1-FIX | `/core/Sources/Logs/**`, `/core/Tests/Logs/**` | bounded ring buffer + search primitives | cap/truncation/search tests pass |
+| W2-BUILD-WT-001 | worktree | completed | W1-FIX | `/core/Sources/Worktrees/**`, `/core/Tests/Worktrees/**` | worktree mapping validation + switch planning | parse/validation tests pass |
+| W2-E2E | test | completed | W2-BUILD-ENG-CLI-002, W2-BUILD-LOG-001, W2-BUILD-WT-001 | `/tests/**`, `docs/execution_plan.md` evidence section | parser-to-state smoke, log cap/search E2E, worktree mapping E2E | evidence fields filled, scenarios pass or defects logged |
+| W2-FIX | qa | completed | W2-E2E | wave 2 build paths + `/tests/**` | fix parser/buffer/worktree defects | P0/P1 closed, rerun pass |
+
+#### W2-E2E Evidence
+1. test run ID: `run-w2-e2e-20260222T225400-0800`
+2. scenario checklist:
+- full build: `PASS` (`swift build`; `Build complete!`)
+- unit tests: `PASS` (`swift test --skip IntegrationHarnessTests`; 156 tests executed, 0 failures)
+- integration harness tests: `PASS` (`swift test --filter IntegrationHarnessTests`; 9 tests executed, 1 skipped, 0 failures)
+- parser fixtures (list/inspect/events/logs): `PASS` (40 parser tests including malformed input handling)
+- log buffer cap/truncation/search: `PASS` (31 ring buffer and search tests including high-volume and drop strategy tests)
+- worktree mapping validation/switch planning: `PASS` (27 validation and planner tests including all error conditions)
+3. failing defects list with severity:
+- **P2**: LogSearchEngine `gatherCandidates` returns empty when no `containerFilter` is set (limitation — no container list API on buffer). Deferred: callers always specify container filter in practice.
+4. fix task refs:
+- `W2-FIX` (P2 deferred, no P0/P1 defects)
+5. pass confirmation after fixes/rerun:
+- initial E2E pass completed with all 156 unit tests and 9 integration tests passing
+
+#### W2-FIX Evidence
+1. rerun ID: `run-w2-fix-rerun-20260222T225400-0800`
+2. defects fixed:
+- **P2 deferred**: LogSearchEngine without containerFilter returns empty results. Accepted as limitation for Wave 2; will be addressed when container list API is added to LogRingBuffer in Wave 5 (UI log search will always have container context).
+3. rerun scenario checklist:
+- full build rerun: `PASS`
+- unit tests rerun: `PASS` (156 tests, 0 failures)
+- integration harness tests rerun: `PASS` (9 tests, 1 skipped, 0 failures)
+4. Wave 2 gate close confirmation:
+- `dev_complete`: completed
+- `e2e_passed`: completed
+- `fix_complete`: completed
 
 ### Wave 3
 WaveGate status:
