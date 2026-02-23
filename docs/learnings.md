@@ -32,7 +32,28 @@
 2. Running `xcodebuild` app-boot smoke alongside focused `swift test --filter` checks gives better signal than only running full-package tests for Wave 0.
 3. Even when no defects are found, marking `W0-FIX` as `no-op (verified)` with a concrete rerun is useful for strict wave-gate closure and downstream dependency confidence.
 
+## 2026-02-22 (integration environment provider)
+1. Using a `DockerAvailabilityChecking` protocol with dependency injection lets the test harness mock Docker presence/health without requiring Docker to be installed, keeping mock-based tests fast and deterministic.
+2. For Swift 6 strict concurrency with Foundation `Process` (non-Sendable), creating the `Process` inside `withCheckedContinuation` and using its `terminationHandler` with a Sendable `CheckedContinuation` avoids capture issues -- the continuation is Sendable, and the process is passed as a parameter to the handler, not captured.
+3. When multiple agents work in parallel on different tasks within the same package, a broken build in one agent's files (for example, Sendable violations in `CLICommandRunner.swift`) blocks compilation of all targets including test targets owned by other agents. This highlights the importance of per-task build isolation or fixing build-breaking errors before merging to shared branches.
+4. Using `XCTSkip` for real-Docker tests is essential for CI environments where Docker may not be available, while still allowing the test to exercise the real code path on developer machines.
+
 ## 2026-02-22 (manual docker log fixtures)
 1. Hosting manual-test containers in an isolated Compose directory with bind-mounted scripts keeps fixture behavior editable without image rebuilds.
 2. `docker compose config` is a fast validation gate for fixture syntax and mount resolution even when the Docker daemon is unavailable.
 3. For manual log-view testing, randomized but structured key-value log lines (for example `latency_ms=`, `bpm=`, `event=`) are more useful than plain free-text spam because they exercise both readability and parsing/search scenarios.
+
+## 2026-02-22 (CLI command runner)
+1. In Swift 6 strict concurrency, `DispatchWorkItem` is not Sendable. Storing it inside an `OSAllocatedUnfairLock`-protected state struct (with `nonisolated(unsafe)`) and using `@preconcurrency import Dispatch` is the cleanest workaround for timeout scheduling in `@Sendable` closures.
+2. `Pipe` and `FileHandle` are Sendable in the current macOS SDK (Swift 6 / macOS 14+), so `nonisolated(unsafe)` annotations on those captures are unnecessary and produce warnings.
+3. When creating a `Task` inside a test method that captures a property of the test class (e.g. `runner`), Swift 6 flags it as a sending violation since `XCTestCase` is not Sendable. The fix is to copy the value into a local `let` before the `Task` closure.
+4. Reading stdout/stderr pipes after process termination via `readDataToEndOfFile()` avoids pipe buffer deadlocks that occur when trying to read concurrently with a running process that produces large output.
+5. Using `withTaskCancellationHandler` + `withCheckedThrowingContinuation` with shared lock state is a reliable pattern for bridging Foundation `Process` into Swift concurrency with proper cancellation and timeout support.
+6. **Critical deadlock pattern**: When using `withCheckedThrowingContinuation` with `Process.terminationHandler`, the `onCancel` handler must NOT set `isFinished = true` and skip continuation resumption. If `onCancel` marks finished and terminates the process, the `terminationHandler` sees `isFinished` and skips resuming the continuation — causing a permanent hang. The fix: `onCancel` and timeout handlers should only set flags (`didCancel`/`didTimeout`) and terminate the process. The `terminationHandler` is the **single point** that resumes the continuation, checking the flags to determine the error type.
+
+## 2026-02-22 (W1-BUILD-STATE-001: settings store + migration + keychain)
+1. Making `MigrationStep` store a `@Sendable` closure requires all captured state to be `Sendable`; this encourages pure-functional migration transforms that reconstruct `AppSettings` rather than mutating shared state.
+2. The `SettingsMigrator.buildChain` algorithm walks steps linearly by matching `fromVersion` to current position, which is simple and correct but assumes no duplicate `fromVersion` entries; adding a uniqueness check would guard against accidental step registration bugs.
+3. Testing keychain logic via an `InMemoryKeychainStore` mock is essential because `SecItem*` APIs require keychain entitlements that are not available in sandboxed test runners or CI environments.
+4. `JSONSettingsStore.save` creating parent directories with `withIntermediateDirectories: true` prevents first-launch failures when the settings directory does not yet exist.
+5. Using `Data.write(to:options:.atomic)` for settings persistence prevents partial-write corruption on crash.
