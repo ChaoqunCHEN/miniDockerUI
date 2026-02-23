@@ -110,18 +110,46 @@ WaveGate status:
 
 ### Wave 1
 WaveGate status:
-- `dev_complete`: pending
-- `e2e_passed`: pending
-- `fix_complete`: pending
+- `dev_complete`: completed
+- `e2e_passed`: completed
+- `fix_complete`: completed
 
 | task_id | lane | status | depends_on | owned_paths | deliverables | acceptance |
 | --- | --- | --- | --- | --- | --- | --- |
-| W1-BUILD-ENG-CLI-001 | engine | pending | W0-FIX | `/core/Sources/Engine/CLI/Runner/**`, `/core/Tests/Engine/CLI/Runner/**` | command runner + process lifecycle controls | success/failure/timeout/cancel tests pass |
-| W1-BUILD-STATE-001 | state | pending | W0-FIX | `/core/Sources/State/Settings/**`, `/core/Tests/State/Settings/**` | JSON settings store + schema migration base + keychain abstraction | load/save/migrate tests pass |
-| W1-BUILD-TEST-HARNESS-001 | test | pending | W0-FIX | `/tests/Integration/Harness/Environment/**` | `IntegrationEnvironmentProvider` base with prepare/endpoint/teardown | deterministic prepare/teardown tests pass |
+| W1-BUILD-ENG-CLI-001 | engine | completed | W0-FIX | `/core/Sources/Engine/CLI/Runner/**`, `/core/Tests/Engine/CLI/Runner/**` | command runner + process lifecycle controls | success/failure/timeout/cancel tests pass |
+| W1-BUILD-STATE-001 | state | completed | W0-FIX | `/core/Sources/State/Settings/**`, `/core/Tests/State/Settings/**` | JSON settings store + schema migration base + keychain abstraction | load/save/migrate tests pass |
+| W1-BUILD-TEST-HARNESS-001 | test | completed | W0-FIX | `/tests/Integration/Harness/Environment/**` | `IntegrationEnvironmentProvider` base with prepare/endpoint/teardown | deterministic prepare/teardown tests pass |
 | W1-BUILD-TEST-FIXTURES-002 | test | completed | W0-FIX | `/docker/manual-fun-fixtures/**`, `Makefile`, `/docs/**` | local manual-test docker compose fixtures with random logs and make targets | `docker compose config` passes; `make manual-fixtures-up` starts fixtures when Docker daemon is available |
-| W1-E2E | test | pending | W1-BUILD-ENG-CLI-001, W1-BUILD-STATE-001, W1-BUILD-TEST-HARNESS-001 | `/tests/**`, `docs/execution_plan.md` evidence section | preflight E2E: dependency checks, settings load/save, env lifecycle | evidence fields filled, scenarios pass or defects logged |
-| W1-FIX | qa | pending | W1-E2E | wave 1 build paths + `/tests/**` | fix runner/settings/provider defects | P0/P1 closed, rerun pass |
+| W1-E2E | test | completed | W1-BUILD-ENG-CLI-001, W1-BUILD-STATE-001, W1-BUILD-TEST-HARNESS-001 | `/tests/**`, `docs/execution_plan.md` evidence section | preflight E2E: dependency checks, settings load/save, env lifecycle | evidence fields filled, scenarios pass or defects logged |
+| W1-FIX | qa | completed | W1-E2E | wave 1 build paths + `/tests/**` | fix runner/settings/provider defects | P0/P1 closed, rerun pass |
+
+#### W1-E2E Evidence
+1. test run ID: `run-w1-e2e-20260222T222745-0800`
+2. scenario checklist:
+- full build: `PASS` (`swift build`; `Build complete!`)
+- unit tests: `PASS` (`swift test --skip IntegrationHarnessTests`; 58 tests executed, 0 failures)
+- integration harness tests: `PASS` (`swift test --filter IntegrationHarnessTests`; 9 tests executed, 1 skipped, 0 failures)
+3. failing defects list with severity:
+- **P0**: CLICommandRunner continuation deadlock — `onCancel` handler set `isFinished = true`, preventing `terminationHandler` from resuming the continuation (permanent hang in timeout/cancellation tests)
+- **P1**: DockerAvailabilityChecker `isDaemonHealthy()` had no timeout — `docker info` against non-responsive daemon causes indefinite hang in integration tests
+4. fix task refs:
+- `W1-FIX` (both P0 and P1 fixed inline)
+5. pass confirmation after fixes/rerun:
+- rerun completed with all scenarios passing (58 unit + 9 integration, 1 skipped)
+
+#### W1-FIX Evidence
+1. rerun ID: `run-w1-fix-rerun-20260222T222745-0800`
+2. defects fixed:
+- **P0 fix**: Changed `CLICommandRunner.run()` so `onCancel` and timeout handlers only set flags (`didCancel`/`didTimeout`) and terminate process; `terminationHandler` is the single point that resumes the continuation, checking flags to determine error type
+- **P1 fix**: Added 10-second timeout with `OSAllocatedUnfairLock`-guarded continuation to `DockerAvailabilityChecker.isDaemonHealthy()`, ensuring process is terminated and continuation resumed on timeout
+3. rerun scenario checklist:
+- full build rerun: `PASS`
+- unit tests rerun: `PASS` (58 tests, 0 failures)
+- integration harness tests rerun: `PASS` (9 tests, 1 skipped, 0 failures)
+4. Wave 1 gate close confirmation:
+- `dev_complete`: completed
+- `e2e_passed`: completed
+- `fix_complete`: completed
 
 ### Wave 2
 WaveGate status:

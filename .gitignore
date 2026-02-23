@@ -35,3 +35,6 @@ result.bundle/
 # Environment files
 .env
 .env.*
+
+# Claude Code
+.claude/worktrees
