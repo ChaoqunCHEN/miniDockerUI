@@ -71,16 +71,42 @@ For every wave `n`:
 
 ### Wave 0
 WaveGate status:
-- `dev_complete`: pending
-- `e2e_passed`: pending
-- `fix_complete`: pending
+- `dev_complete`: completed
+- `e2e_passed`: completed
+- `fix_complete`: completed
 
 | task_id | lane | status | depends_on | owned_paths | deliverables | acceptance |
 | --- | --- | --- | --- | --- | --- | --- |
-| W0-BUILD-BOOT-001 | platform | blocked | none | `/app/**`, `/core/**`, `/tests/**`, build config | repo bootstrap with app/core/tests skeleton | app and test targets compile |
-| W0-BUILD-CONTRACT-001 | engine | pending | W0-BUILD-BOOT-001 | `/core/**Contracts**`, `/core/**Types**` | contracts from `highlevel_design.md` represented in code | contract compile + unit tests pass |
-| W0-E2E | test | pending | W0-BUILD-BOOT-001, W0-BUILD-CONTRACT-001 | `/tests/**`, `docs/execution_plan.md` evidence section | app boot smoke + test target smoke + harness skeleton smoke | evidence fields filled, smoke scenarios pass or defects logged |
-| W0-FIX | qa | pending | W0-E2E | wave 0 build paths + `/tests/**` | resolve bootstrap/harness defects from W0-E2E | P0/P1 closed, rerun pass, mark `fix_complete` |
+| W0-BUILD-BOOT-001 | platform | completed | none | `/app/**`, `/core/**`, `/tests/**`, build config | repo bootstrap with app/core/tests skeleton | app and test targets compile |
+| W0-BUILD-CONTRACT-001 | engine | completed | W0-BUILD-BOOT-001 | `/core/**Contracts**`, `/core/**Types**` | contracts from `highlevel_design.md` represented in code | contract compile + unit tests pass |
+| W0-E2E | test | completed | W0-BUILD-BOOT-001, W0-BUILD-CONTRACT-001 | `/tests/**`, `docs/execution_plan.md` evidence section | app boot smoke + test target smoke + harness skeleton smoke | evidence fields filled, smoke scenarios pass or defects logged |
+| W0-FIX | qa | completed | W0-E2E | wave 0 build paths + `/tests/**` | resolve bootstrap/harness defects from W0-E2E | P0/P1 closed, rerun pass, mark `fix_complete` |
+
+#### W0-E2E Evidence
+1. test run ID: `run-w0-e2e-20260222T104002-0800`
+2. scenario checklist:
+- app boot smoke: `PASS` (`xcodebuild -project app/miniDockerUI.xcodeproj -scheme miniDockerUI -destination 'platform=macOS' -derivedDataPath .build/DerivedData build`; `** BUILD SUCCEEDED **`)
+- test target smoke: `PASS` (`swift test --filter MiniDockerCoreTests`; 16 tests executed, 0 failures)
+- harness skeleton smoke: `PASS` (`swift test --filter IntegrationHarnessTests`; 2 tests executed, 0 failures)
+3. failing defects list with severity:
+- none
+4. fix task refs:
+- `W0-FIX` (no-op verified)
+5. pass confirmation after fixes/rerun:
+- initial smoke pass completed, and Wave 0 rerun evidence captured in `W0-FIX` section below.
+
+#### W0-FIX Evidence
+1. rerun ID: `run-w0-fix-rerun-20260222T104028-0800`
+2. defects fixed:
+- none (no P0/P1 defects found; no agreed P2 defects opened)
+3. rerun scenario checklist:
+- app boot smoke rerun: `PASS` (`xcodebuild ... build`; `** BUILD SUCCEEDED **`)
+- test target smoke rerun: `PASS` (`swift test --filter MiniDockerCoreTests`; 16 tests executed, 0 failures)
+- harness skeleton smoke rerun: `PASS` (`swift test --filter IntegrationHarnessTests`; 2 tests executed, 0 failures)
+4. Wave 0 gate close confirmation:
+- `dev_complete`: completed
+- `e2e_passed`: completed
+- `fix_complete`: completed
 
 ### Wave 1
 WaveGate status:
@@ -93,6 +119,7 @@ WaveGate status:
 | W1-BUILD-ENG-CLI-001 | engine | pending | W0-FIX | `/core/Sources/Engine/CLI/Runner/**`, `/core/Tests/Engine/CLI/Runner/**` | command runner + process lifecycle controls | success/failure/timeout/cancel tests pass |
 | W1-BUILD-STATE-001 | state | pending | W0-FIX | `/core/Sources/State/Settings/**`, `/core/Tests/State/Settings/**` | JSON settings store + schema migration base + keychain abstraction | load/save/migrate tests pass |
 | W1-BUILD-TEST-HARNESS-001 | test | pending | W0-FIX | `/tests/Integration/Harness/Environment/**` | `IntegrationEnvironmentProvider` base with prepare/endpoint/teardown | deterministic prepare/teardown tests pass |
+| W1-BUILD-TEST-FIXTURES-002 | test | completed | W0-FIX | `/docker/manual-fun-fixtures/**`, `Makefile`, `/docs/**` | local manual-test docker compose fixtures with random logs and make targets | `docker compose config` passes; `make manual-fixtures-up` starts fixtures when Docker daemon is available |
 | W1-E2E | test | pending | W1-BUILD-ENG-CLI-001, W1-BUILD-STATE-001, W1-BUILD-TEST-HARNESS-001 | `/tests/**`, `docs/execution_plan.md` evidence section | preflight E2E: dependency checks, settings load/save, env lifecycle | evidence fields filled, scenarios pass or defects logged |
 | W1-FIX | qa | pending | W1-E2E | wave 1 build paths + `/tests/**` | fix runner/settings/provider defects | P0/P1 closed, rerun pass |
 

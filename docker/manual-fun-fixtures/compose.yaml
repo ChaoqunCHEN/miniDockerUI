@@ -1,0 +1,22 @@
+services:
+  disco_bot:
+    image: alpine:3.20
+    container_name: mini-dockerui-disco-bot
+    command: ["sh", "/opt/fun/disco-bot.sh"]
+    volumes:
+      - ./scripts:/opt/fun:ro
+    labels:
+      miniDockerUI.fixture: "true"
+      miniDockerUI.fixture.kind: "manual-random-logs"
+    restart: unless-stopped
+
+  chaos_oracle:
+    image: alpine:3.20
+    container_name: mini-dockerui-chaos-oracle
+    command: ["sh", "/opt/fun/chaos-oracle.sh"]
+    volumes:
+      - ./scripts:/opt/fun:ro
+    labels:
+      miniDockerUI.fixture: "true"
+      miniDockerUI.fixture.kind: "manual-random-logs"
+    restart: unless-stopped

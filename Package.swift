@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "miniDockerUI",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v14),
     ],
     products: [
         .library(
@@ -14,7 +14,7 @@ let package = Package(
         .executable(
             name: "miniDockerUIApp",
             targets: ["miniDockerUIApp"]
-        )
+        ),
     ],
     targets: [
         .target(
@@ -24,7 +24,10 @@ let package = Package(
         .executableTarget(
             name: "miniDockerUIApp",
             dependencies: ["MiniDockerCore"],
-            path: "app/Sources/miniDockerUIApp"
+            path: "app/Sources/miniDockerUIApp",
+            resources: [
+                .process("Assets.xcassets"),
+            ]
         ),
         .testTarget(
             name: "MiniDockerCoreTests",
@@ -34,7 +37,8 @@ let package = Package(
         .testTarget(
             name: "IntegrationHarnessTests",
             dependencies: ["MiniDockerCore"],
-            path: "tests/Integration"
-        )
+            path: "tests/Integration",
+            exclude: ["README.md"]
+        ),
     ]
 )
