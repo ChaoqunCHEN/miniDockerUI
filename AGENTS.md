@@ -25,9 +25,11 @@ Agents should:
 1. Claim a task from the execution plan.
 2. Plan the task, and persists plan in ./docs/features as a new file
 3. Generate code + tests + docs.
-4. Run static analysis.
-5. Commit code.
-6. Update execution plan, feature doc.
+4. Run `make autoformat` after coding changes.
+5. Validate with `make build` and `make tests` (and `make e2e-tests` when integration coverage is required).
+6. Run static analysis.
+7. Commit code.
+8. Update execution plan, feature doc.
 
 ### 📝 Reporting
 After each commit, agents write to:
@@ -44,3 +46,4 @@ After each commit, agents write to:
 - After feature completion, always look for refactorying oppotunities to improve code clarity, readabiltiy, and re-useablitly.
 - Modularize code as much as possible.
 - Whenever fixing error, bug, do not fix it by adding bandit, but proactivily look into archetecture flaws and improve it. Fix the root cause from first principle. 
+- Use context7 MCP server for reading the latest docker API/CLI documentations

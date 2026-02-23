@@ -1,5 +1,5 @@
-import SwiftUI
 import MiniDockerCore
+import SwiftUI
 
 @main
 struct MiniDockerUIApp: App {

@@ -1,5 +1,5 @@
-import XCTest
 @testable import MiniDockerCore
+import XCTest
 
 final class MiniDockerCoreTests: XCTestCase {
     func testPreflightSummaryIsStable() {

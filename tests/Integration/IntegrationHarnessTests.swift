@@ -1,6 +1,6 @@
 import Foundation
-import XCTest
 @testable import MiniDockerCore
+import XCTest
 
 final class IntegrationHarnessTests: XCTestCase {
     func testRunIDPrefixShape() {
