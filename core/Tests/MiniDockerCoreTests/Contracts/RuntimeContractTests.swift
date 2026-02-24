@@ -132,7 +132,7 @@ private struct StubEngineAdapter: EngineAdapter {
     }
 }
 
-private final class InMemorySettingsStore: AppSettingsStore {
+private final class InMemorySettingsStore: AppSettingsStore, Sendable {
     private let snapshot: AppSettingsSnapshot
 
     init(snapshot: AppSettingsSnapshot) {

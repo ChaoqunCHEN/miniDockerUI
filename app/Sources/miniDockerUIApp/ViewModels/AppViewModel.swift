@@ -34,29 +34,29 @@ final class AppViewModel {
     // MARK: - Container Actions
 
     func startContainer(id: String) async {
-        do {
+        await performAction("start container") {
             try await engine.startContainer(id: id)
-            await loadContainers()
-        } catch {
-            errorMessage = "Failed to start container: \(error.localizedDescription)"
         }
     }
 
     func stopContainer(id: String) async {
-        do {
+        await performAction("stop container") {
             try await engine.stopContainer(id: id, timeoutSeconds: nil)
-            await loadContainers()
-        } catch {
-            errorMessage = "Failed to stop container: \(error.localizedDescription)"
         }
     }
 
     func restartContainer(id: String) async {
-        do {
+        await performAction("restart container") {
             try await engine.restartContainer(id: id, timeoutSeconds: nil)
+        }
+    }
+
+    private func performAction(_ label: String, action: () async throws -> Void) async {
+        do {
+            try await action()
             await loadContainers()
         } catch {
-            errorMessage = "Failed to restart container: \(error.localizedDescription)"
+            errorMessage = "Failed to \(label): \(error.localizedDescription)"
         }
     }
 
@@ -65,15 +65,23 @@ final class AppViewModel {
     func startEventStream() {
         guard eventStreamTask == nil else { return }
         eventStreamTask = Task { [weak self] in
-            guard let self else { return }
-            do {
-                for try await _ in engine.streamEvents(since: Date()) {
-                    await loadContainers()
-                }
-            } catch {
-                if !Task.isCancelled {
+            var retryDelay: UInt64 = 1_000_000_000 // 1 second
+            let maxDelay: UInt64 = 30_000_000_000 // 30 seconds
+
+            while !Task.isCancelled {
+                guard let self else { return }
+                do {
+                    for try await _ in engine.streamEvents(since: Date()) {
+                        retryDelay = 1_000_000_000
+                        await loadContainers()
+                    }
+                    // Stream ended cleanly, reconnect after delay
+                } catch {
+                    if Task.isCancelled { return }
                     errorMessage = "Event stream error: \(error.localizedDescription)"
                 }
+                try? await Task.sleep(nanoseconds: retryDelay)
+                retryDelay = min(retryDelay * 2, maxDelay)
             }
         }
     }

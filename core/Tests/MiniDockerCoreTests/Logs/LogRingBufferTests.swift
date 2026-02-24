@@ -219,6 +219,27 @@ final class LogRingBufferTests: XCTestCase {
         XCTAssertEqual(buffer.totalLineCount, 0)
     }
 
+    func testContainerIdsEmpty() {
+        let buffer = LogRingBuffer(policy: makePolicy())
+        XCTAssertTrue(buffer.containerIds.isEmpty)
+    }
+
+    func testContainerIdsReturnsAllKnownIds() {
+        let buffer = LogRingBuffer(policy: makePolicy())
+        buffer.append(makeEntry(containerId: "c1"))
+        buffer.append(makeEntry(containerId: "c2"))
+        buffer.append(makeEntry(containerId: "c3"))
+        XCTAssertEqual(buffer.containerIds, Set(["c1", "c2", "c3"]))
+    }
+
+    func testContainerIdsAfterClear() {
+        let buffer = LogRingBuffer(policy: makePolicy())
+        buffer.append(makeEntry(containerId: "c1"))
+        buffer.append(makeEntry(containerId: "c2"))
+        buffer.clear(containerId: "c1")
+        XCTAssertEqual(buffer.containerIds, Set(["c2"]))
+    }
+
     func testHighVolumeAppend() {
         let buffer = LogRingBuffer(policy: makePolicy(maxLines: 50))
         for i in 0 ..< 1000 {

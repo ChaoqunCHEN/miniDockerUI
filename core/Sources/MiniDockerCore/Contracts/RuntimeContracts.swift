@@ -10,7 +10,7 @@ public protocol EngineAdapter: Sendable {
     func streamLogs(id: String, options: LogStreamOptions) -> AsyncThrowingStream<LogEntry, Error>
 }
 
-public protocol AppSettingsStore {
+public protocol AppSettingsStore: Sendable {
     func load() throws -> AppSettingsSnapshot
     func save(_ snapshot: AppSettingsSnapshot) throws
 }

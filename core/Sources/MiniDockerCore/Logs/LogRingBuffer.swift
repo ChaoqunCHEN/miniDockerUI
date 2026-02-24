@@ -106,10 +106,15 @@ public final class LogRingBuffer: Sendable {
         state.withLock { $0.buffers.values.reduce(0) { $0 + $1.totalBytes } }
     }
 
+    /// The set of container IDs that have buffered entries.
+    public var containerIds: Set<String> {
+        state.withLock { Set($0.buffers.keys) }
+    }
+
     // MARK: - Clear
 
     public func clear(containerId: String) {
-        state.withLock { $0.buffers.removeValue(forKey: containerId) }
+        state.withLock { _ = $0.buffers.removeValue(forKey: containerId) }
     }
 
     public func clearAll() {
@@ -143,7 +148,7 @@ public final class LogRingBuffer: Sendable {
 
         switch policy.dropStrategy {
         case .dropNewest, .blockProducer:
-            let buf = s.buffers[cid]!
+            guard let buf = s.buffers[cid] else { return 0 }
             if buf.count >= capacity || (buf.totalBytes + cost) > policy.maxBytesPerContainer {
                 return 0
             }
@@ -162,7 +167,7 @@ public final class LogRingBuffer: Sendable {
             }
         }
 
-        var buf = s.buffers[cid]!
+        guard var buf = s.buffers[cid] else { return evicted }
         let writeIndex = (buf.head + buf.count) % capacity
         buf.entries[writeIndex] = entry
         buf.count += 1

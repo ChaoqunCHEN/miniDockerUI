@@ -19,6 +19,7 @@
 	W3A10006000000000000000B /* ContainerLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W3A10006000000000000000F /* ContainerLogView.swift */; };
 	W3A10007000000000000000B /* ContainerInspectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W3A10007000000000000000F /* ContainerInspectView.swift */; };
 	W3A10008000000000000000B /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W3A10008000000000000000F /* EmptyStateView.swift */; };
+	W3A10009000000000000000B /* ErrorBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W3A10009000000000000000F /* ErrorBannerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +36,7 @@
 	W3A10006000000000000000F /* ContainerLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerLogView.swift; sourceTree = "<group>"; };
 	W3A10007000000000000000F /* ContainerInspectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerInspectView.swift; sourceTree = "<group>"; };
 	W3A10008000000000000000F /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+	W3A10009000000000000000F /* ErrorBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorBannerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -96,6 +98,7 @@
 			W3A10006000000000000000F /* ContainerLogView.swift */,
 			W3A10007000000000000000F /* ContainerInspectView.swift */,
 			W3A10008000000000000000F /* EmptyStateView.swift */,
+			W3A10009000000000000000F /* ErrorBannerView.swift */,
 		);
 		path = Views;
 		sourceTree = "<group>";
@@ -193,6 +196,7 @@
 			W3A10006000000000000000B /* ContainerLogView.swift in Sources */,
 			W3A10007000000000000000B /* ContainerInspectView.swift in Sources */,
 			W3A10008000000000000000B /* EmptyStateView.swift in Sources */,
+			W3A10009000000000000000B /* ErrorBannerView.swift in Sources */,
 		);
 		runOnlyForDeploymentPostprocessing = 0;
 	};

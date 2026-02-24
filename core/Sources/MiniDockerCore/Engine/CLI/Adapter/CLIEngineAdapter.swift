@@ -1,5 +1,4 @@
 import Foundation
-import os
 
 /// Implements ``EngineAdapter`` by delegating to the Docker CLI.
 ///
