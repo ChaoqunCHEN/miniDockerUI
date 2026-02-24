@@ -3,11 +3,11 @@ import SwiftUI
 
 @main
 struct MiniDockerUIApp: App {
-    @State private var status: String = MiniDockerCore.preflightSummary()
+    @State private var viewModel = AppViewModel(engine: CLIEngineAdapter())
 
     var body: some Scene {
         WindowGroup {
-            ContentView(status: $status)
+            ContentView(viewModel: viewModel)
                 .frame(minWidth: 900, minHeight: 560)
         }
     }

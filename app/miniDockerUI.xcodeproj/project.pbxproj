@@ -11,6 +11,14 @@
 	A1B2C3D51E00100000000001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D21E00100000000001 /* ContentView.swift */; };
 	A1B2C3E41E00100000000001 /* MiniDockerCore in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3E51E00100000000001 /* MiniDockerCore */; };
 	A1B2C3F21E00100000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3F11E00100000000001 /* Assets.xcassets */; };
+	W3A10001000000000000000B /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = W3A10001000000000000000F /* AppViewModel.swift */; };
+	W3A10002000000000000000B /* ContainerDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = W3A10002000000000000000F /* ContainerDetailViewModel.swift */; };
+	W3A10003000000000000000B /* ContainerListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W3A10003000000000000000F /* ContainerListView.swift */; };
+	W3A10004000000000000000B /* ContainerRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W3A10004000000000000000F /* ContainerRowView.swift */; };
+	W3A10005000000000000000B /* ContainerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W3A10005000000000000000F /* ContainerDetailView.swift */; };
+	W3A10006000000000000000B /* ContainerLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W3A10006000000000000000F /* ContainerLogView.swift */; };
+	W3A10007000000000000000B /* ContainerInspectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W3A10007000000000000000F /* ContainerInspectView.swift */; };
+	W3A10008000000000000000B /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W3A10008000000000000000F /* EmptyStateView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -19,6 +27,14 @@
 	A1B2C3D31E00100000000001 /* Bootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bootstrap.swift; sourceTree = "<group>"; };
 	A1B2C3D91E00100000000001 /* miniDockerUI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = miniDockerUI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 	A1B2C3F11E00100000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+	W3A10001000000000000000F /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
+	W3A10002000000000000000F /* ContainerDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerDetailViewModel.swift; sourceTree = "<group>"; };
+	W3A10003000000000000000F /* ContainerListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerListView.swift; sourceTree = "<group>"; };
+	W3A10004000000000000000F /* ContainerRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerRowView.swift; sourceTree = "<group>"; };
+	W3A10005000000000000000F /* ContainerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerDetailView.swift; sourceTree = "<group>"; };
+	W3A10006000000000000000F /* ContainerLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerLogView.swift; sourceTree = "<group>"; };
+	W3A10007000000000000000F /* ContainerInspectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerInspectView.swift; sourceTree = "<group>"; };
+	W3A10008000000000000000F /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,9 +71,33 @@
 		children = (
 			A1B2C3D11E00100000000001 /* miniDockerUIApp.swift */,
 			A1B2C3D21E00100000000001 /* ContentView.swift */,
+			W3A10009000000000000000G /* ViewModels */,
+			W3A1000A000000000000000G /* Views */,
 			A1B2C3F11E00100000000001 /* Assets.xcassets */,
 		);
 		path = Sources/miniDockerUIApp;
+		sourceTree = "<group>";
+	};
+	W3A10009000000000000000G /* ViewModels */ = {
+		isa = PBXGroup;
+		children = (
+			W3A10001000000000000000F /* AppViewModel.swift */,
+			W3A10002000000000000000F /* ContainerDetailViewModel.swift */,
+		);
+		path = ViewModels;
+		sourceTree = "<group>";
+	};
+	W3A1000A000000000000000G /* Views */ = {
+		isa = PBXGroup;
+		children = (
+			W3A10003000000000000000F /* ContainerListView.swift */,
+			W3A10004000000000000000F /* ContainerRowView.swift */,
+			W3A10005000000000000000F /* ContainerDetailView.swift */,
+			W3A10006000000000000000F /* ContainerLogView.swift */,
+			W3A10007000000000000000F /* ContainerInspectView.swift */,
+			W3A10008000000000000000F /* EmptyStateView.swift */,
+		);
+		path = Views;
 		sourceTree = "<group>";
 	};
 	A1B2C3E11E00100000000001 /* CoreSources */ = {
@@ -145,6 +185,14 @@
 		files = (
 			A1B2C3D41E00100000000001 /* miniDockerUIApp.swift in Sources */,
 			A1B2C3D51E00100000000001 /* ContentView.swift in Sources */,
+			W3A10001000000000000000B /* AppViewModel.swift in Sources */,
+			W3A10002000000000000000B /* ContainerDetailViewModel.swift in Sources */,
+			W3A10003000000000000000B /* ContainerListView.swift in Sources */,
+			W3A10004000000000000000B /* ContainerRowView.swift in Sources */,
+			W3A10005000000000000000B /* ContainerDetailView.swift in Sources */,
+			W3A10006000000000000000B /* ContainerLogView.swift in Sources */,
+			W3A10007000000000000000B /* ContainerInspectView.swift in Sources */,
+			W3A10008000000000000000B /* EmptyStateView.swift in Sources */,
 		);
 		runOnlyForDeploymentPostprocessing = 0;
 	};

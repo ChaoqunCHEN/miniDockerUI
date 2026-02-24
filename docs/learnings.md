@@ -68,3 +68,20 @@
 7. Worktree validation should be a pure function layer with no filesystem access — this makes it trivially testable and separates validation from execution. The planner takes `runningContainerIds` as a parameter rather than querying Docker.
 8. Path normalization (stripping trailing `/`) must be applied consistently across all path comparisons. Using a shared `normalizePath()` helper prevents subtle prefix-matching bugs.
 9. Separating `WorktreeValidationError` from `CoreError` provides granular per-field validation feedback suitable for UI display without polluting the command/protocol error taxonomy.
+
+## 2026-02-23 (Wave 3: CLIEngineAdapter + ReadinessEvaluator + App Shell)
+1. Extracting a `CommandRunning` protocol from the concrete `CLICommandRunner` struct is essential for adapter-level unit testing — it allows injecting a `MockCommandRunner` that returns canned responses without launching real processes.
+2. A `DataLineAccumulator` (buffered newline splitter) is a reusable primitive for any CLI stream-to-parsed-object pipeline. Keeping it as a small `mutating struct` with `feed()` and `flush()` makes it independently testable.
+3. The `EngineAdapter` protocol must inherit `Sendable` for Swift 6 strict concurrency when stored as `any EngineAdapter` in `@MainActor`-isolated ViewModels. Without this, the compiler rejects cross-actor usage.
+4. Using `@Observable` (Observation framework) instead of `ObservableObject` eliminates `@Published` boilerplate and provides more granular tracking of property access in SwiftUI views.
+5. When constructing detail ViewModels in NavigationSplitView's detail pane, applying `.id(selectedId)` forces SwiftUI to recreate the view (and ViewModel) on selection change, ensuring log streams are properly cancelled and restarted for the new container.
+6. Log entry capping in the ViewModel (e.g., 5000 lines with `removeFirst` trimming) provides a simple backpressure mechanism before the full `LogRingBuffer` integration in later waves.
+7. For streaming methods (`streamEvents`, `streamLogs`), wrapping `runner.stream()` in a new `AsyncThrowingStream` that transforms `Data` chunks into parsed domain objects via `DataLineAccumulator` keeps the adapter's public API clean while handling all buffering internally.
+8. The event stream pattern (background Task that iterates events and refreshes the container list on each event) provides near-real-time UI updates without polling, but needs proper cancellation via `Task.cancel()` on view disappear to avoid process leaks.
+
+## 2026-02-24 (Wave 3 E2E: integration scenario tests)
+1. Writing integration-level scenario tests that exercise the adapter through `MockCommandRunner` (not just unit-level individual method tests) catches end-to-end data flow issues like NDJSON parsing across multiple containers, stream chunking reassembly, and sequence numbering correctness.
+2. Cross-integration tests (LogRingBuffer → ReadinessEvaluator, LogSearchEngine → ReadinessEvaluator) validate that types flowing between components are compatible and that the boundary `windowStart` date filtering works correctly across the full pipeline.
+3. The `ReadinessEvaluator` uses `entry.timestamp < windowStart` for stale-line rejection, meaning entries at exactly `windowStart` are **included** (boundary-inclusive). This was verified with a dedicated integration test and should be documented for future consumers.
+4. The adapter's streaming methods correctly pass through all log lines without capping — the 5000-line cap is purely a ViewModel responsibility. This separation was verified by feeding 6000 lines through the adapter and confirming all were yielded.
+5. When Docker is available locally, real-Docker integration tests (`testRealListContainersReturnsArray`, `testRealInspectKnownFixture`) exercise the full CLI → parser → adapter pipeline against the actual Docker daemon, catching issues that mock-based tests cannot (e.g., JSON format changes, encoding issues).

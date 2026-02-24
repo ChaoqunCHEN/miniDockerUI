@@ -196,17 +196,49 @@ WaveGate status:
 
 ### Wave 3
 WaveGate status:
-- `dev_complete`: pending
-- `e2e_passed`: pending
-- `fix_complete`: pending
+- `dev_complete`: completed
+- `e2e_passed`: completed
+- `fix_complete`: completed
 
 | task_id | lane | status | depends_on | owned_paths | deliverables | acceptance |
 | --- | --- | --- | --- | --- | --- | --- |
-| W3-BUILD-ENG-CLI-003 | engine | pending | W2-FIX | `/core/Sources/Engine/CLI/Adapter/**`, `/core/Tests/Engine/CLI/Adapter/**` | `CLIEngineAdapter` implementing lifecycle/list/log/event calls | adapter tests pass |
-| W3-BUILD-READY-001 | readiness | pending | W2-FIX | `/core/Sources/Readiness/**`, `/core/Tests/Readiness/**` | health and regex readiness evaluator | health-first + stale-line guard tests pass |
-| W3-BUILD-UI-001 | ui | pending | W2-FIX | `/app/**` (app shell + wiring only), `/tests/UI/Smoke/**` | app shell, navigation, dependency wiring | shell boot and smoke tests pass |
-| W3-E2E | test | pending | W3-BUILD-ENG-CLI-003, W3-BUILD-READY-001, W3-BUILD-UI-001 | `/tests/**`, `docs/execution_plan.md` evidence section | app shell + real adapter lifecycle E2E + readiness transitions | evidence fields filled, scenarios pass or defects logged |
-| W3-FIX | qa | pending | W3-E2E | wave 3 build paths + `/tests/**` | fix adapter integration and app runtime defects | P0/P1 closed, rerun pass |
+| W3-BUILD-ENG-CLI-003 | engine | completed | W2-FIX | `/core/Sources/Engine/CLI/Adapter/**`, `/core/Tests/Engine/CLI/Adapter/**` | `CLIEngineAdapter` implementing lifecycle/list/log/event calls via CLI + `CommandRunning` protocol + `DataLineAccumulator` | adapter tests pass (19 tests) |
+| W3-BUILD-READY-001 | readiness | completed | W2-FIX | `/core/Sources/Readiness/**`, `/core/Tests/Readiness/**` | `ReadinessEvaluator` with health/regex/combined modes + stale-line rejection + `ReadinessResult` type | health-first + stale-line guard tests pass (15 tests) |
+| W3-BUILD-UI-001 | ui | completed | W2-FIX | `/app/**` | App shell with NavigationSplitView, container list/detail/log/inspect views, AppViewModel + ContainerDetailViewModel with live event/log streaming, start/stop/restart actions | shell boots and 198 unit tests pass |
+| W3-E2E | test | completed | W3-BUILD-ENG-CLI-003, W3-BUILD-READY-001, W3-BUILD-UI-001 | `/tests/**`, `docs/execution_plan.md` evidence section | app shell + real adapter lifecycle E2E + readiness transitions | evidence fields filled, scenarios pass or defects logged |
+| W3-FIX | qa | completed | W3-E2E | wave 3 build paths + `/tests/**` | fix adapter integration and app runtime defects | P0/P1 closed, rerun pass |
+
+#### W3-E2E Evidence
+1. test run ID: `run-w3-e2e-20260224T001951-0800`
+2. scenario checklist:
+- full build: `PASS` (`swift build`; `Build complete!`)
+- unit tests: `PASS` (`swift test --skip IntegrationHarnessTests`; 198 tests executed, 0 failures)
+- integration harness tests: `PASS` (`swift test --filter IntegrationHarnessTests`; 26 tests executed, 0 skipped, 0 failures)
+- S1 app launch + preflight: `PASS` (build succeeds, 9 existing harness tests pass including environment provider lifecycle)
+- S2 adapter lifecycle (mock): `PASS` (7 mock-based tests — multi-container list round-trip, full inspect detail, start/stop/restart sequence, error propagation, multiple event streaming, chunked log delivery, no-cap verification)
+- S3 event stream + reconciliation: `PASS` (12-event stream test verifies sequential numbering and envelope completeness)
+- S4 log streaming + chunked delivery + memory caps: `PASS` (chunked delivery reassembles correctly across 4 sub-line chunks; 6000-line test confirms adapter does not cap entries)
+- S5 readiness health + regex + stale-line rejection: `PASS` (8 tests — all health status variants, realistic regex matching, 50-entry stale rejection, fallback chain, mustMatchCount accumulation, window boundary inclusiveness, LogRingBuffer→evaluator cross-integration, LogSearch→evaluator cross-integration)
+- S6 real adapter lifecycle: `PASS` (Docker available — `testRealListContainersReturnsArray` and `testRealInspectKnownFixture` both passed against local Docker daemon)
+3. failing defects list with severity:
+- none
+4. fix task refs:
+- `W3-FIX` (no-op verified)
+5. pass confirmation after fixes/rerun:
+- initial E2E pass completed with all 198 unit tests and 26 integration tests passing
+
+#### W3-FIX Evidence
+1. rerun ID: `run-w3-fix-rerun-20260224T001951-0800`
+2. defects fixed:
+- none (no P0/P1 defects found; no agreed P2 defects opened)
+3. rerun scenario checklist:
+- full build rerun: `PASS`
+- unit tests rerun: `PASS` (198 tests, 0 failures)
+- integration harness tests rerun: `PASS` (26 tests, 0 skipped, 0 failures)
+4. Wave 3 gate close confirmation:
+- `dev_complete`: completed
+- `e2e_passed`: completed
+- `fix_complete`: completed
 
 ### Wave 4
 WaveGate status:

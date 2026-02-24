@@ -1,25 +1,28 @@
+import MiniDockerCore
 import SwiftUI
 
 struct ContentView: View {
-    @Binding var status: String
+    @Bindable var viewModel: AppViewModel
 
     var body: some View {
         NavigationSplitView {
-            List {
-                Section("Containers") {
-                    Label("No containers yet", systemImage: "shippingbox")
-                }
-            }
+            ContainerListView(viewModel: viewModel)
         } detail: {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("miniDockerUI")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                Text(status)
-                    .foregroundStyle(.secondary)
-                Spacer()
+            if let selectedId = viewModel.selectedContainerId {
+                ContainerDetailView(
+                    viewModel: ContainerDetailViewModel(
+                        engine: viewModel.engine,
+                        containerId: selectedId
+                    )
+                )
+                .id(selectedId)
+            } else {
+                EmptyStateView()
             }
-            .padding(24)
+        }
+        .task {
+            await viewModel.loadContainers()
+            viewModel.startEventStream()
         }
     }
 }

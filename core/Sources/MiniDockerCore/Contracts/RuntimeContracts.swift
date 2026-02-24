@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol EngineAdapter {
+public protocol EngineAdapter: Sendable {
     func listContainers() async throws -> [ContainerSummary]
     func inspectContainer(id: String) async throws -> ContainerDetail
     func startContainer(id: String) async throws
