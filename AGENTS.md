@@ -27,9 +27,10 @@ Agents should:
 3. Generate code + tests + docs.
 4. Run `make autoformat` after coding changes.
 5. Validate with `make build` and `make tests` (and `make e2e-tests` when integration coverage is required).
-6. Run static analysis.
-7. Commit code.
-8. Update execution plan, feature doc.
+6. **When adding new Swift files under `/app/Sources/miniDockerUIApp/`**, update `app/miniDockerUI.xcodeproj/project.pbxproj` to register them (PBXFileReference, PBXBuildFile, PBXGroup entries). SwiftPM auto-discovers files but the Xcode project has a static file list. Verify with `xcodebuild -project app/miniDockerUI.xcodeproj -scheme miniDockerUI -destination 'platform=macOS,arch=arm64' build`.
+7. Run static analysis.
+8. Commit code.
+9. Update execution plan, feature doc.
 
 ### 📝 Reporting
 After each commit, agents write to:
