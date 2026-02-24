@@ -48,17 +48,12 @@ struct ContainerDetailView: View {
         .onDisappear {
             viewModel.stopLogStream()
         }
-        .overlay {
+        .overlay(alignment: .bottom) {
             if let error = viewModel.errorMessage {
-                VStack {
-                    Spacer()
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .padding(8)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
-                        .padding()
+                ErrorBannerView(message: error) {
+                    viewModel.errorMessage = nil
                 }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
     }
@@ -74,20 +69,18 @@ struct ContainerDetailView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            statusBadge(status: detail.summary.status, health: detail.summary.health)
+            statusBadge(for: detail.summary)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
 
-    @ViewBuilder
-    private func statusBadge(status: String, health _: ContainerHealthStatus?) -> some View {
-        let isRunning = status.lowercased().hasPrefix("up")
+    private func statusBadge(for summary: ContainerSummary) -> some View {
         HStack(spacing: 4) {
             Circle()
-                .fill(isRunning ? .green : .gray)
+                .fill(summary.statusColor.swiftUIColor)
                 .frame(width: 8, height: 8)
-            Text(isRunning ? "Running" : "Stopped")
+            Text(summary.displayStatus)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -98,7 +91,7 @@ struct ContainerDetailView: View {
 
     @ViewBuilder
     private var actionButtons: some View {
-        let isRunning = viewModel.detail?.summary.status.lowercased().hasPrefix("up") ?? false
+        let isRunning = viewModel.detail?.summary.isRunning ?? false
 
         Button {
             Task { await viewModel.startContainer() }

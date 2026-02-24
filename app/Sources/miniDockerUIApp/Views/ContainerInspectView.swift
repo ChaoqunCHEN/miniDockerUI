@@ -144,10 +144,14 @@ struct ContainerInspectView: View {
         }
     }
 
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .medium
+        return f
+    }()
+
     private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .medium
-        return formatter.string(from: date)
+        Self.dateFormatter.string(from: date)
     }
 }

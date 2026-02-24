@@ -169,4 +169,31 @@ final class LogSearchEngineTests: XCTestCase {
         XCTAssertEqual(results.count, 1)
         XCTAssertEqual(results[0].matchRanges.count, 2)
     }
+
+    // MARK: - Search Without Container Filter
+
+    func testSearchWithoutContainerFilterReturnsAllContainers() {
+        let base = Date()
+        let buffer = makeBuffer(entries: [
+            makeEntry(containerId: "c1", message: "match-c1", timestamp: base),
+            makeEntry(containerId: "c2", message: "match-c2", timestamp: base.addingTimeInterval(1)),
+            makeEntry(containerId: "c3", message: "no-hit", timestamp: base.addingTimeInterval(2)),
+        ])
+        let query = LogSearchQuery(pattern: "match")
+        let results = engine.search(in: buffer, query: query)
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].entry.containerId, "c1")
+        XCTAssertEqual(results[1].entry.containerId, "c2")
+    }
+
+    func testCountWithoutContainerFilter() {
+        let buffer = makeBuffer(entries: [
+            makeEntry(containerId: "c1", message: "match"),
+            makeEntry(containerId: "c2", message: "match"),
+            makeEntry(containerId: "c3", message: "nope"),
+        ])
+        let query = LogSearchQuery(pattern: "match")
+        let count = engine.count(in: buffer, query: query)
+        XCTAssertEqual(count, 2)
+    }
 }

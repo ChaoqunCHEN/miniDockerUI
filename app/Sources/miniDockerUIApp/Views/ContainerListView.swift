@@ -47,13 +47,13 @@ struct ContainerListView: View {
 
     private var runningContainers: [ContainerSummary] {
         viewModel.containers
-            .filter { $0.status.lowercased().hasPrefix("up") }
+            .filter(\.isRunning)
             .sorted { $0.name < $1.name }
     }
 
     private var stoppedContainers: [ContainerSummary] {
         viewModel.containers
-            .filter { !$0.status.lowercased().hasPrefix("up") }
+            .filter { !$0.isRunning }
             .sorted { $0.name < $1.name }
     }
 }

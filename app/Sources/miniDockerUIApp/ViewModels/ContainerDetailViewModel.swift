@@ -25,29 +25,29 @@ final class ContainerDetailViewModel {
     // MARK: - Actions
 
     func startContainer() async {
-        do {
+        await performAction("start") {
             try await engine.startContainer(id: containerId)
-            await loadDetail()
-        } catch {
-            errorMessage = "Failed to start: \(error.localizedDescription)"
         }
     }
 
     func stopContainer() async {
-        do {
+        await performAction("stop") {
             try await engine.stopContainer(id: containerId, timeoutSeconds: nil)
-            await loadDetail()
-        } catch {
-            errorMessage = "Failed to stop: \(error.localizedDescription)"
         }
     }
 
     func restartContainer() async {
-        do {
+        await performAction("restart") {
             try await engine.restartContainer(id: containerId, timeoutSeconds: nil)
+        }
+    }
+
+    private func performAction(_ label: String, action: () async throws -> Void) async {
+        do {
+            try await action()
             await loadDetail()
         } catch {
-            errorMessage = "Failed to restart: \(error.localizedDescription)"
+            errorMessage = "Failed to \(label): \(error.localizedDescription)"
         }
     }
 

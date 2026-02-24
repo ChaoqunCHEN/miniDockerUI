@@ -22,9 +22,9 @@ public struct JSONSettingsStore: AppSettingsStore, Sendable {
         do {
             data = try Data(contentsOf: url)
         } catch {
-            throw CoreError.outputParseFailure(
-                context: "JSONSettingsStore.load",
-                rawSnippet: "Failed to read file at \(filePath): \(error.localizedDescription)"
+            throw CoreError.fileReadFailed(
+                path: filePath,
+                reason: error.localizedDescription
             )
         }
 
@@ -52,9 +52,9 @@ public struct JSONSettingsStore: AppSettingsStore, Sendable {
                     attributes: nil
                 )
             } catch {
-                throw CoreError.outputParseFailure(
-                    context: "JSONSettingsStore.save",
-                    rawSnippet: "Failed to create directory \(parentDirectory.path): \(error.localizedDescription)"
+                throw CoreError.directoryCreateFailed(
+                    path: parentDirectory.path,
+                    reason: error.localizedDescription
                 )
             }
         }
@@ -66,18 +66,18 @@ public struct JSONSettingsStore: AppSettingsStore, Sendable {
         do {
             data = try encoder.encode(snapshot)
         } catch {
-            throw CoreError.outputParseFailure(
+            throw CoreError.encodingFailed(
                 context: "JSONSettingsStore.save",
-                rawSnippet: "Failed to encode settings: \(error.localizedDescription)"
+                reason: error.localizedDescription
             )
         }
 
         do {
             try data.write(to: url, options: .atomic)
         } catch {
-            throw CoreError.outputParseFailure(
-                context: "JSONSettingsStore.save",
-                rawSnippet: "Failed to write file at \(filePath): \(error.localizedDescription)"
+            throw CoreError.fileWriteFailed(
+                path: filePath,
+                reason: error.localizedDescription
             )
         }
     }

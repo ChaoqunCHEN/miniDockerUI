@@ -78,6 +78,37 @@ public struct ContainerSummary: Sendable, Codable, Equatable {
     }
 }
 
+// MARK: - ContainerSummary Computed Properties
+
+public enum ContainerStatusColor: String, Sendable, CaseIterable {
+    case running
+    case warning
+    case stopped
+}
+
+public extension ContainerSummary {
+    var isRunning: Bool {
+        status.lowercased().hasPrefix("up")
+    }
+
+    var displayStatus: String {
+        let lower = status.lowercased()
+        if lower.hasPrefix("up") { return "Running" }
+        if lower.contains("exited") { return "Exited" }
+        if lower.contains("created") { return "Created" }
+        if lower.contains("paused") { return "Paused" }
+        return status
+    }
+
+    var statusColor: ContainerStatusColor {
+        if isRunning {
+            if health == .unhealthy { return .warning }
+            return .running
+        }
+        return .stopped
+    }
+}
+
 public struct ContainerMount: Sendable, Codable, Equatable {
     public let source: String
     public let destination: String

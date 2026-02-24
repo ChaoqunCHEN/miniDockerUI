@@ -20,9 +20,20 @@ struct ContentView: View {
                 EmptyStateView()
             }
         }
+        .overlay(alignment: .bottom) {
+            if let error = viewModel.errorMessage {
+                ErrorBannerView(message: error) {
+                    viewModel.errorMessage = nil
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .task {
             await viewModel.loadContainers()
             viewModel.startEventStream()
+        }
+        .onDisappear {
+            viewModel.stopEventStream()
         }
     }
 }

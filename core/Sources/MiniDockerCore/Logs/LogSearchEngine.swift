@@ -42,13 +42,13 @@ public struct LogSearchEngine: Sendable {
             return applyStreamFilter(entries, filter: query.streamFilter)
         }
 
-        // No container filter: we need all containers. Unfortunately the buffer
-        // doesn't expose a list of container IDs, so we rely on the time-filtered
-        // API. For now, get all entries for each container.
-        // We work around this by accessing the buffer per-container.
-        // Since we don't have a container list API, we gather from all.
-        // This is a limitation — in practice the caller usually specifies a container.
-        return []
+        // No container filter: gather from all containers, merged by timestamp.
+        var all: [LogEntry] = []
+        for cid in buffer.containerIds {
+            let entries = buffer.entries(forContainer: cid, from: query.fromDate, to: query.toDate)
+            all.append(contentsOf: applyStreamFilter(entries, filter: query.streamFilter))
+        }
+        return all.sorted { $0.timestamp < $1.timestamp }
     }
 
     private func applyStreamFilter(_ entries: [LogEntry], filter: Set<LogStream>?) -> [LogEntry] {

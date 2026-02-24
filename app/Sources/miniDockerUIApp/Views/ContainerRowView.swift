@@ -7,7 +7,7 @@ struct ContainerRowView: View {
     var body: some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(statusColor)
+                .fill(container.statusColor.swiftUIColor)
                 .frame(width: 8, height: 8)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -23,30 +23,22 @@ struct ContainerRowView: View {
 
             Spacer()
 
-            Text(statusLabel)
+            Text(container.displayStatus)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
     }
+}
 
-    private var statusColor: Color {
-        let lower = container.status.lowercased()
-        if lower.hasPrefix("up") {
-            if container.health == .unhealthy {
-                return .orange
-            }
-            return .green
+// MARK: - ContainerStatusColor SwiftUI Extension
+
+extension ContainerStatusColor {
+    var swiftUIColor: Color {
+        switch self {
+        case .running: .green
+        case .warning: .orange
+        case .stopped: .gray
         }
-        return .gray
-    }
-
-    private var statusLabel: String {
-        let lower = container.status.lowercased()
-        if lower.hasPrefix("up") { return "Running" }
-        if lower.contains("exited") { return "Exited" }
-        if lower.contains("created") { return "Created" }
-        if lower.contains("paused") { return "Paused" }
-        return container.status
     }
 }
