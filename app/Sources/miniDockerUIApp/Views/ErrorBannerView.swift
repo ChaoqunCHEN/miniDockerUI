@@ -28,10 +28,10 @@ struct ErrorBannerView: View {
         .padding(.bottom, 8)
         .onAppear {
             autoDismissTask = Task {
-                try? await Task.sleep(for: .seconds(8))
-                if !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(8))
                     onDismiss()
-                }
+                } catch {}
             }
         }
         .onDisappear {

@@ -40,5 +40,10 @@ let package = Package(
             path: "tests/Integration",
             exclude: ["README.md"]
         ),
+        .testTarget(
+            name: "UIContainerTests",
+            dependencies: ["MiniDockerCore"],
+            path: "tests/UI/Containers"
+        ),
     ]
 )
