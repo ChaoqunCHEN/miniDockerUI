@@ -40,6 +40,14 @@ struct ContainerDetailView: View {
             ToolbarItemGroup {
                 actionButtons
             }
+            ToolbarItem {
+                Button {
+                    viewModel.clearLogs()
+                } label: {
+                    Label("Clear Logs", systemImage: "trash")
+                }
+                .help("Clear logs")
+            }
         }
         .task {
             await viewModel.loadDetail()

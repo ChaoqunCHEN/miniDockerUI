@@ -6,19 +6,31 @@ struct ContainerListView: View {
 
     var body: some View {
         List(selection: $viewModel.selectedContainerId) {
-            if !runningContainers.isEmpty {
-                Section("Running") {
-                    ForEach(runningContainers, id: \.id) { container in
-                        ContainerRowView(container: container)
-                            .tag(container.id)
-                    }
-                }
-            }
-            if !stoppedContainers.isEmpty {
-                Section("Stopped") {
-                    ForEach(stoppedContainers, id: \.id) { container in
-                        ContainerRowView(container: container)
-                            .tag(container.id)
+            let groups = ContainerGrouper.group(
+                containers: viewModel.containers,
+                favoriteKeys: viewModel.favoriteKeys,
+                keyForContainer: { viewModel.containerKey(for: $0) }
+            )
+            ForEach(groups, id: \.title) { group in
+                Section(group.title) {
+                    ForEach(group.containers, id: \.id) { container in
+                        ContainerRowView(
+                            container: container,
+                            isFavorite: viewModel.isFavorite(container),
+                            isActionInProgress: viewModel.actionInProgress[container.id] != nil,
+                            onToggleFavorite: { viewModel.toggleFavorite(for: container) }
+                        )
+                        .tag(container.id)
+                        .contextMenu {
+                            ContainerContextMenu(
+                                container: container,
+                                isFavorite: viewModel.isFavorite(container),
+                                onStart: { Task { await viewModel.startContainer(id: container.id) } },
+                                onStop: { Task { await viewModel.stopContainer(id: container.id) } },
+                                onRestart: { Task { await viewModel.restartContainer(id: container.id) } },
+                                onToggleFavorite: { viewModel.toggleFavorite(for: container) }
+                            )
+                        }
                     }
                 }
             }
@@ -43,17 +55,5 @@ struct ContainerListView: View {
                 )
             }
         }
-    }
-
-    private var runningContainers: [ContainerSummary] {
-        viewModel.containers
-            .filter(\.isRunning)
-            .sorted { $0.name < $1.name }
-    }
-
-    private var stoppedContainers: [ContainerSummary] {
-        viewModel.containers
-            .filter { !$0.isRunning }
-            .sorted { $0.name < $1.name }
     }
 }

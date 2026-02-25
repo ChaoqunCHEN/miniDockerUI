@@ -32,9 +32,9 @@ public struct JSONSettingsStore: AppSettingsStore, Sendable {
         do {
             return try decoder.decode(AppSettingsSnapshot.self, from: data)
         } catch {
-            throw CoreError.outputParseFailure(
+            throw CoreError.decodingFailed(
                 context: "JSONSettingsStore.load",
-                rawSnippet: String(data: data.prefix(200), encoding: .utf8) ?? "<binary>"
+                reason: error.localizedDescription
             )
         }
     }

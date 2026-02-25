@@ -11,16 +11,32 @@ final class ContainerSummaryComputedTests: XCTestCase {
         XCTAssertTrue(makeSummary(status: "up About an hour").isRunning)
     }
 
+    func testIsRunningForDockerInspectRunningStatus() {
+        XCTAssertTrue(makeSummary(status: "running").isRunning)
+    }
+
     func testIsRunningForNonUpStatus() {
         XCTAssertFalse(makeSummary(status: "Exited (0) 1 minute ago").isRunning)
         XCTAssertFalse(makeSummary(status: "Created").isRunning)
         XCTAssertFalse(makeSummary(status: "Paused").isRunning)
     }
 
+    func testIsNotRunningForDockerInspectExitedStatus() {
+        XCTAssertFalse(makeSummary(status: "exited").isRunning)
+    }
+
+    func testIsNotRunningForDockerInspectCreatedStatus() {
+        XCTAssertFalse(makeSummary(status: "created").isRunning)
+    }
+
     // MARK: - displayStatus
 
     func testDisplayStatusRunning() {
         XCTAssertEqual(makeSummary(status: "Up 5 minutes").displayStatus, "Running")
+    }
+
+    func testDisplayStatusRunningFromDockerInspect() {
+        XCTAssertEqual(makeSummary(status: "running").displayStatus, "Running")
     }
 
     func testDisplayStatusExited() {
@@ -58,7 +74,15 @@ final class ContainerSummaryComputedTests: XCTestCase {
     }
 
     func testStatusColorRunningStartingHealth() {
-        XCTAssertEqual(makeSummary(status: "Up 5 minutes", health: .starting).statusColor, .running)
+        XCTAssertEqual(makeSummary(status: "Up 5 minutes", health: .starting).statusColor, .warning)
+    }
+
+    func testStatusColorRunningFromDockerInspect() {
+        XCTAssertEqual(makeSummary(status: "running").statusColor, .running)
+    }
+
+    func testStatusColorStoppedFromDockerInspect() {
+        XCTAssertEqual(makeSummary(status: "exited").statusColor, .stopped)
     }
 
     // MARK: - Helpers

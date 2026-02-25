@@ -7,6 +7,7 @@ import Foundation
 /// - Context: endpoint or environment unreachable
 /// - Command/Protocol: process execution failures
 /// - Parse/Contract: output cannot be understood or violates expectations
+/// - I/O: file system and serialization failures
 /// - Policy: disallowed operation or invalid configuration transition
 public enum CoreError: Error, Sendable, Equatable {
     // MARK: - Dependency errors
@@ -36,6 +37,7 @@ public enum CoreError: Error, Sendable, Equatable {
     case fileReadFailed(path: String, reason: String)
     case fileWriteFailed(path: String, reason: String)
     case directoryCreateFailed(path: String, reason: String)
+    case decodingFailed(context: String, reason: String)
     case encodingFailed(context: String, reason: String)
 
     // MARK: - Policy errors
@@ -77,6 +79,8 @@ extension CoreError: LocalizedError {
             "Failed to write '\(path)': \(reason)"
         case let .directoryCreateFailed(path, reason):
             "Failed to create directory '\(path)': \(reason)"
+        case let .decodingFailed(context, reason):
+            "Decoding failed in \(context): \(reason)"
         case let .encodingFailed(context, reason):
             "Encoding failed in \(context): \(reason)"
         case let .operationNotPermitted(action, reason):

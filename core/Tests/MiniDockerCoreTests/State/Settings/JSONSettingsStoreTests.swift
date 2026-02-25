@@ -48,8 +48,8 @@ final class JSONSettingsStoreTests: XCTestCase {
 
         let store = JSONSettingsStore(filePath: filePath)
         XCTAssertThrowsError(try store.load()) { error in
-            guard case CoreError.outputParseFailure = error else {
-                XCTFail("Expected CoreError.outputParseFailure, got \(error)")
+            guard case CoreError.decodingFailed = error else {
+                XCTFail("Expected CoreError.decodingFailed, got \(error)")
                 return
             }
         }

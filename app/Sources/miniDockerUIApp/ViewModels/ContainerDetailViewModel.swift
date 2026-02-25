@@ -16,6 +16,7 @@ final class ContainerDetailViewModel {
 
     private var logStreamTask: Task<Void, Never>?
     private let maxLogEntries = 5000
+    private var logsSince: Date?
 
     init(engine: any EngineAdapter, containerId: String) {
         self.engine = engine
@@ -25,9 +26,10 @@ final class ContainerDetailViewModel {
     // MARK: - Actions
 
     func startContainer() async {
-        await performAction("start") {
+        let success = await performAction("start") {
             try await engine.startContainer(id: containerId)
         }
+        if success { restartLogStream() }
     }
 
     func stopContainer() async {
@@ -37,18 +39,29 @@ final class ContainerDetailViewModel {
     }
 
     func restartContainer() async {
-        await performAction("restart") {
+        let success = await performAction("restart") {
             try await engine.restartContainer(id: containerId, timeoutSeconds: nil)
         }
+        if success { restartLogStream() }
     }
 
-    private func performAction(_ label: String, action: () async throws -> Void) async {
+    @discardableResult
+    private func performAction(_ label: String, action: () async throws -> Void) async -> Bool {
         do {
             try await action()
             await loadDetail()
+            return true
         } catch {
             errorMessage = "Failed to \(label): \(error.localizedDescription)"
+            return false
         }
+    }
+
+    private func restartLogStream() {
+        stopLogStream()
+        logEntries.removeAll()
+        logsSince = Date()
+        startLogStream()
     }
 
     // MARK: - Detail
@@ -69,11 +82,12 @@ final class ContainerDetailViewModel {
     func startLogStream() {
         guard logStreamTask == nil else { return }
         isStreamingLogs = true
+        let since = logsSince
         logStreamTask = Task { [weak self] in
             guard let self else { return }
             let options = LogStreamOptions(
-                since: nil,
-                tail: 200,
+                since: since,
+                tail: since == nil ? 200 : 0,
                 includeStdout: true,
                 includeStderr: true,
                 timestamps: true,
@@ -91,6 +105,9 @@ final class ContainerDetailViewModel {
                     errorMessage = "Log stream error: \(error.localizedDescription)"
                 }
             }
+            // Stream ended (container stopped or connection lost) — clean up
+            // so startLogStream() can be called again
+            logStreamTask = nil
             isStreamingLogs = false
         }
     }
@@ -99,5 +116,9 @@ final class ContainerDetailViewModel {
         logStreamTask?.cancel()
         logStreamTask = nil
         isStreamingLogs = false
+    }
+
+    func clearLogs() {
+        restartLogStream()
     }
 }

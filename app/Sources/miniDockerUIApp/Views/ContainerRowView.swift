@@ -3,12 +3,21 @@ import SwiftUI
 
 struct ContainerRowView: View {
     let container: ContainerSummary
+    var isFavorite: Bool = false
+    var isActionInProgress: Bool = false
+    var onToggleFavorite: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(container.statusColor.swiftUIColor)
-                .frame(width: 8, height: 8)
+            if isActionInProgress {
+                ProgressView()
+                    .controlSize(.mini)
+                    .frame(width: 8, height: 8)
+            } else {
+                Circle()
+                    .fill(container.statusColor.swiftUIColor)
+                    .frame(width: 8, height: 8)
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(container.name)
@@ -22,6 +31,15 @@ struct ContainerRowView: View {
             }
 
             Spacer()
+
+            if let onToggleFavorite {
+                Button(action: onToggleFavorite) {
+                    Image(systemName: isFavorite ? "star.fill" : "star")
+                        .foregroundStyle(isFavorite ? .yellow : .secondary)
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+            }
 
             Text(container.displayStatus)
                 .font(.caption2)

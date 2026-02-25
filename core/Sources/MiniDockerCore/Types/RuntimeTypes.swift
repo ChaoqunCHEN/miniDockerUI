@@ -88,12 +88,13 @@ public enum ContainerStatusColor: String, Sendable, CaseIterable {
 
 public extension ContainerSummary {
     var isRunning: Bool {
-        status.lowercased().hasPrefix("up")
+        let lower = status.lowercased()
+        return lower.hasPrefix("up") || lower == "running"
     }
 
     var displayStatus: String {
+        if isRunning { return "Running" }
         let lower = status.lowercased()
-        if lower.hasPrefix("up") { return "Running" }
         if lower.contains("exited") { return "Exited" }
         if lower.contains("created") { return "Created" }
         if lower.contains("paused") { return "Paused" }
@@ -102,7 +103,7 @@ public extension ContainerSummary {
 
     var statusColor: ContainerStatusColor {
         if isRunning {
-            if health == .unhealthy { return .warning }
+            if health == .unhealthy || health == .starting { return .warning }
             return .running
         }
         return .stopped
@@ -420,6 +421,19 @@ public struct AppSettings: Sendable, Codable, Equatable {
         self.worktreeMappings = worktreeMappings
         self.readinessRules = readinessRules
         self.transientUIPreferences = transientUIPreferences
+    }
+}
+
+public extension AppSettings {
+    func with(favoriteContainerKeys: Set<String>) -> AppSettings {
+        AppSettings(
+            schemaVersion: schemaVersion,
+            favoriteContainerKeys: favoriteContainerKeys,
+            actionPreferences: actionPreferences,
+            worktreeMappings: worktreeMappings,
+            readinessRules: readinessRules,
+            transientUIPreferences: transientUIPreferences
+        )
     }
 }
 

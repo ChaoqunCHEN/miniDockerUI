@@ -20,6 +20,7 @@ final class CoreErrorLocalizedTests: XCTestCase {
             .fileReadFailed(path: "/tmp/test", reason: "permission denied"),
             .fileWriteFailed(path: "/tmp/test", reason: "disk full"),
             .directoryCreateFailed(path: "/tmp/test", reason: "permission denied"),
+            .decodingFailed(context: "settings", reason: "invalid JSON"),
             .encodingFailed(context: "settings", reason: "invalid data"),
             .operationNotPermitted(action: "delete", reason: "read-only"),
             .schemaMigrationUnsupported(from: "0.9.0", to: "2.0.0"),
