@@ -12,7 +12,8 @@ struct ContentView: View {
                 ContainerDetailView(
                     viewModel: ContainerDetailViewModel(
                         engine: viewModel.engine,
-                        containerId: selectedId
+                        containerId: selectedId,
+                        logBuffer: viewModel.logBuffer
                     )
                 )
                 .id(selectedId)

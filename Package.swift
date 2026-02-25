@@ -45,5 +45,10 @@ let package = Package(
             dependencies: ["MiniDockerCore"],
             path: "tests/UI/Containers"
         ),
+        .testTarget(
+            name: "UIAdvancedTests",
+            dependencies: ["MiniDockerCore"],
+            path: "tests/UI/Advanced"
+        ),
     ]
 )
