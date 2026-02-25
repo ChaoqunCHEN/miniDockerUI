@@ -292,17 +292,57 @@ WaveGate status:
 
 ### Wave 5
 WaveGate status:
-- `dev_complete`: pending
-- `e2e_passed`: pending
-- `fix_complete`: pending
+- `dev_complete`: completed
+- `e2e_passed`: completed
+- `fix_complete`: completed
 
 | task_id | lane | status | depends_on | owned_paths | deliverables | acceptance |
 | --- | --- | --- | --- | --- | --- | --- |
-| W5-BUILD-ENG-CLI-004 | engine | pending | W4-FIX | `/core/Sources/Engine/CLI/Streams/**`, `/core/Tests/Engine/CLI/Streams/**` | stream supervisor + reconnect/backoff/resync | disconnect/recovery tests pass |
-| W5-BUILD-UI-003 | ui | pending | W4-FIX | `/app/Features/Logs/**`, `/app/Features/Readiness/**`, `/app/Features/Worktrees/**`, `/tests/UI/Advanced/**` | logs/search, readiness, worktree switch UI flows | advanced view model and UI tests pass |
-| W5-BUILD-TEST-HARNESS-003 | test | pending | W4-FIX | `/tests/Integration/Scenarios/Logs/**`, `/tests/Integration/Scenarios/Recovery/**`, `/tests/Integration/Scenarios/Worktrees/**` | advanced integration scenario matrix | all advanced scenarios executable without manual steps |
-| W5-E2E | test | pending | W5-BUILD-ENG-CLI-004, W5-BUILD-UI-003, W5-BUILD-TEST-HARNESS-003 | `/tests/**`, `docs/execution_plan.md` evidence section | reconnect/resync, log burst, readiness stale-line, worktree switch/restart E2E | evidence fields filled, scenarios pass or defects logged |
-| W5-FIX | qa | pending | W5-E2E | wave 5 build paths + `/tests/**` | fix stream/recovery/log/readiness/worktree defects | P0/P1 closed, rerun pass |
+| W5-BUILD-ENG-CLI-004 | engine | completed | W4-FIX | `/core/Sources/Engine/CLI/Streams/**`, `/core/Tests/Engine/CLI/Streams/**` | stream supervisor + reconnect/backoff/resync (4 source files, 21 tests) | disconnect/recovery tests pass |
+| W5-BUILD-UI-003 | ui | completed | W4-FIX | `/app/Features/Logs/**`, `/app/Features/Readiness/**`, `/app/Features/Worktrees/**`, `/tests/UI/Advanced/**` | logs/search, readiness, worktree switch UI flows (8 source files, 33 tests) | advanced view model and UI tests pass |
+| W5-BUILD-TEST-HARNESS-003 | test | completed | W4-FIX | `/tests/Integration/Scenarios/Logs/**`, `/tests/Integration/Scenarios/Recovery/**`, `/tests/Integration/Scenarios/Worktrees/**` | advanced integration scenario matrix (40 tests: 33 mock + 7 real Docker) | all advanced scenarios executable without manual steps |
+| W5-E2E | test | completed | W5-BUILD-ENG-CLI-004, W5-BUILD-UI-003, W5-BUILD-TEST-HARNESS-003 | `/tests/**`, `docs/execution_plan.md` evidence section | reconnect/resync, log burst, readiness stale-line, worktree switch/restart E2E | evidence fields filled, scenarios pass or defects logged |
+| W5-FIX | qa | completed | W5-E2E | wave 5 build paths + `/tests/**` | fix stream/recovery/log/readiness/worktree defects | P0/P1 closed, rerun pass |
+
+#### W5-FIX Evidence
+1. rerun ID: `run-w5-fix-rerun-20260225T012400-0800`
+2. defects fixed:
+- P1: Xcode project.pbxproj missing 8 Wave 5 UI files — fixed by adding PBXFileReference, PBXBuildFile, PBXGroup entries for Logs/Readiness/Worktrees feature directories
+3. rerun scenario checklist:
+- full build rerun: `PASS`
+- unit tests rerun: `PASS` (345 tests, 0 failures)
+- integration harness tests rerun: `PASS` (98 tests, 0 failures)
+- Xcode build rerun: `PASS` (BUILD SUCCEEDED)
+4. Wave 5 gate close confirmation:
+- `dev_complete`: completed
+- `e2e_passed`: completed
+- `fix_complete`: completed
+
+#### W5-E2E Evidence
+1. test run ID: `run-w5-e2e-20260225T011900-0800`
+2. scenario checklist:
+- S1 full build: `PASS` (`swift build`; `Build complete!`)
+- S2 unit tests: `PASS` (`swift test --skip IntegrationHarnessTests`; 345 tests executed, 0 failures)
+- S3 integration harness tests: `PASS` (`swift test --filter IntegrationHarnessTests`; 98 tests executed, 0 failures)
+- S4 Xcode build: `PASS` (`xcodebuild -project app/miniDockerUI.xcodeproj -scheme miniDockerUI -destination 'platform=macOS,arch=arm64' build`; BUILD SUCCEEDED)
+- S5 stream supervisor + reconnect/backoff/resync (unit): `PASS` (21 tests — backoff policy exponential computation/capping, supervisor phase state machine, successful stream event delivery, disconnect→backoff→resync flow, exhaustion after max retries, failure counter reset on success, cancellation during stream/backoff, since parameter forwarding, clean stream end reconnect, resync container delivery, resync failure resilience)
+- S6 log search + ring buffer integration (unit): `PASS` (9 tests — substring/regex/exact search modes, case sensitivity, stream filter, match range highlighting, max results limit, clear/navigation, invalid regex error handling)
+- S7 readiness evaluation (unit): `PASS` (9 tests — health-only/regex-only/health-then-regex modes, stale-line rejection, must-match count, rule building from editing state, window start computation, invalid regex error handling)
+- S8 worktree switch planning (unit): `PASS` (12 tests — valid plans, all restart policies: never/ifRunning/always, same-worktree rejection, outside-repo rejection, non-absolute path rejection, readiness rule validation)
+- S9 container detail log buffer integration (unit): `PASS` (5 tests — buffer empty state, append/retrieve, clear, order preservation, ring buffer eviction)
+- S10 log burst + memory cap enforcement (integration): `PASS` (7 tests — 50K→10K line cap with dropOldest, byte cap enforcement, dropNewest strategy, search after burst, multi-container independent caps, 2 real Docker tests)
+- S11 log stream search scenarios (integration): `PASS` (5 tests — stream filter stdout/stderr, time-windowed search, maxResults limit, regex under burst load, case-insensitive search)
+- S12 stream disconnect/recovery scenarios (integration): `PASS` (7 tests — disconnect→disconnected state, resync replaces state, reconnect with --since replay, multiple disconnect/reconnect cycles, action during disconnect, 2 real Docker tests)
+- S13 state resync after gap (integration): `PASS` (5 tests — sequence gap triggers resyncRequired, resync snapshot resolves gap, batch apply stops at first gap, fresh sequence after resync accepted, concurrent access thread safety)
+- S14 worktree switch integration (integration): `PASS` (8 tests — full switch flow with mock, ifRunning running/stopped policies, never/always policies, same-worktree rejection, outside-repo rejection, 1 real Docker test)
+- S15 worktree readiness verification (integration): `PASS` (8 tests — stale-line rejection after restart, fresh ready line succeeds, health check short-circuits, timestamp window boundary, buffer→search→evaluator pipeline, partial matches, 2 real Docker tests)
+3. failing defects list with severity:
+- P1: Xcode project.pbxproj missing 8 new Wave 5 UI files (fixed during E2E — added PBXFileReference, PBXBuildFile, PBXGroup entries for Logs/Readiness/Worktrees features)
+- no other defects found (0 P0, 0 P2)
+4. fix task refs:
+- `W5-FIX` (pbxproj fix applied during E2E; remaining: verify rerun)
+5. pass confirmation after fixes/rerun:
+- all 345 unit tests and 98 integration tests passing, 0 failures; Xcode build succeeded after pbxproj fix
 
 ### Wave 6
 WaveGate status:

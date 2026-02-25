@@ -7,6 +7,7 @@ struct ContainerDetailView: View {
 
     enum DetailTab: String, CaseIterable {
         case logs = "Logs"
+        case readiness = "Readiness"
         case inspect = "Inspect"
     }
 
@@ -31,7 +32,13 @@ struct ContainerDetailView: View {
             // Tab content
             switch selectedTab {
             case .logs:
-                ContainerLogView(viewModel: viewModel)
+                EnhancedLogView(detailViewModel: viewModel)
+            case .readiness:
+                ReadinessTrackerView(viewModel: ReadinessViewModel(
+                    engine: viewModel.engine,
+                    buffer: viewModel.logBuffer,
+                    containerId: viewModel.containerId
+                ))
             case .inspect:
                 ContainerInspectView(viewModel: viewModel)
             }

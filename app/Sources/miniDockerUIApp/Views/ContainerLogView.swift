@@ -8,7 +8,7 @@ struct ContainerLogView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 1) {
-                    ForEach(Array(viewModel.logEntries.enumerated()), id: \.offset) { index, entry in
+                    ForEach(Array(viewModel.displayEntries.enumerated()), id: \.offset) { index, entry in
                         logEntryRow(entry: entry)
                             .id(index)
                     }
@@ -16,7 +16,7 @@ struct ContainerLogView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
-            .onChange(of: viewModel.logEntries.count) { _, newCount in
+            .onChange(of: viewModel.displayEntries.count) { _, newCount in
                 if newCount > 0 {
                     withAnimation(.easeOut(duration: 0.1)) {
                         proxy.scrollTo(newCount - 1, anchor: .bottom)
@@ -33,7 +33,7 @@ struct ContainerLogView: View {
                     Text("Live")
                         .font(.caption2)
                 }
-                Text("\(viewModel.logEntries.count) lines")
+                Text("\(viewModel.displayEntries.count) lines")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

@@ -7,6 +7,7 @@ import SwiftUI
 final class AppViewModel {
     let engine: any EngineAdapter
     let settingsStore: any AppSettingsStore
+    let logBuffer: LogRingBuffer
 
     var containers: [ContainerSummary] = []
     var selectedContainerId: String?
@@ -17,9 +18,10 @@ final class AppViewModel {
 
     private var eventStreamTask: Task<Void, Never>?
 
-    init(engine: any EngineAdapter, settingsStore: any AppSettingsStore) {
+    init(engine: any EngineAdapter, settingsStore: any AppSettingsStore, logBuffer: LogRingBuffer) {
         self.engine = engine
         self.settingsStore = settingsStore
+        self.logBuffer = logBuffer
         loadFavorites()
     }
 

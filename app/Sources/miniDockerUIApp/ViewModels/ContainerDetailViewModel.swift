@@ -5,22 +5,25 @@ import SwiftUI
 @MainActor
 @Observable
 final class ContainerDetailViewModel {
-    private let engine: any EngineAdapter
+    let engine: any EngineAdapter
     let containerId: String
+    let logBuffer: LogRingBuffer
 
     var detail: ContainerDetail?
-    var logEntries: [LogEntry] = []
+    var displayEntries: [LogEntry] = []
     var isLoadingDetail: Bool = false
     var isStreamingLogs: Bool = false
     var errorMessage: String?
+    var healthStatus: ContainerHealthStatus?
 
     private var logStreamTask: Task<Void, Never>?
-    private let maxLogEntries = 5000
+    private var flushTask: Task<Void, Never>?
     private var logsSince: Date?
 
-    init(engine: any EngineAdapter, containerId: String) {
+    init(engine: any EngineAdapter, containerId: String, logBuffer: LogRingBuffer) {
         self.engine = engine
         self.containerId = containerId
+        self.logBuffer = logBuffer
     }
 
     // MARK: - Actions
@@ -59,7 +62,8 @@ final class ContainerDetailViewModel {
 
     private func restartLogStream() {
         stopLogStream()
-        logEntries.removeAll()
+        logBuffer.clear(containerId: containerId)
+        displayEntries.removeAll()
         logsSince = Date()
         startLogStream()
     }
@@ -71,6 +75,7 @@ final class ContainerDetailViewModel {
         errorMessage = nil
         do {
             detail = try await engine.inspectContainer(id: containerId)
+            healthStatus = detail?.healthDetail?.status
         } catch {
             errorMessage = "Failed to inspect container: \(error.localizedDescription)"
         }
@@ -95,30 +100,47 @@ final class ContainerDetailViewModel {
             )
             do {
                 for try await entry in engine.streamLogs(id: containerId, options: options) {
-                    logEntries.append(entry)
-                    if logEntries.count > maxLogEntries {
-                        logEntries.removeFirst(logEntries.count - maxLogEntries)
-                    }
+                    logBuffer.append(entry)
                 }
             } catch {
                 if !Task.isCancelled {
                     errorMessage = "Log stream error: \(error.localizedDescription)"
                 }
             }
-            // Stream ended (container stopped or connection lost) — clean up
+            // Stream ended (container stopped or connection lost) -- clean up
             // so startLogStream() can be called again
             logStreamTask = nil
             isStreamingLogs = false
         }
+        startFlushTimer()
     }
 
     func stopLogStream() {
         logStreamTask?.cancel()
         logStreamTask = nil
+        stopFlushTimer()
         isStreamingLogs = false
     }
 
     func clearLogs() {
         restartLogStream()
+    }
+
+    // MARK: - Flush Timer (~30 Hz)
+
+    private func startFlushTimer() {
+        guard flushTask == nil else { return }
+        flushTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 33_000_000) // ~30 Hz
+                guard let self else { return }
+                displayEntries = logBuffer.entries(forContainer: containerId)
+            }
+        }
+    }
+
+    private func stopFlushTimer() {
+        flushTask?.cancel()
+        flushTask = nil
     }
 }

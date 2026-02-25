@@ -93,3 +93,11 @@
 4. The container naming convention `mdui-test-{runID}-{descriptorKey}` provides natural namespacing that prevents collision between concurrent test runs while remaining human-readable in `docker ps` output.
 5. For event stream tests, using a timeout Task that cancels the event collection Task after N seconds is the most reliable pattern for testing `AsyncThrowingStream` consumption without risking indefinite hangs in CI.
 6. Docker may return non-zero exit codes for idempotent operations (e.g., stopping an already-stopped container). Test assertions should account for this by accepting either success or specific expected errors.
+
+## 2026-02-25 (Wave 5: Advanced Scenario Test Suite)
+1. When creating thread-safe mock types for Swift 6 strict concurrency, wrapping all mutable state in a single `OSAllocatedUnfairLock<State>` struct is cleaner than having multiple locks. The `@unchecked Sendable` conformance is then applied to the outer class only.
+2. For high-volume log burst tests, generating entries with deterministic patterns (e.g., every Nth entry contains a marker) makes search result counts exactly predictable, providing precise assertions rather than range-based checks.
+3. The `ContainerStateReducer.applyResyncSnapshot` resets `lastEventSequence` to `nil`, which means the very first event after resync (sequence 0) is always accepted without gap detection. This is the correct behavior for a fresh stream session.
+4. Testing `ContainerStateHolder` thread safety with `withTaskGroup` running concurrent event application, resync snapshots, and state reads validates the `OSAllocatedUnfairLock`-based protection without needing external concurrency frameworks.
+5. For worktree switch integration tests, the planner is pure-functional (no Docker/filesystem access), so mock tests only need to verify input validation and restart target computation. The real Docker test validates the end-to-end flow: plan -> restart -> verify state.
+6. Readiness stale-line rejection uses `entry.timestamp < windowStart` (strict less-than), meaning entries at exactly `windowStart` are included. This boundary behavior is critical for post-restart readiness checks where `windowStart` is set to the restart time.
