@@ -64,7 +64,7 @@ public struct CLICommandRunner: Sendable {
                 if let timeout = request.timeoutSeconds {
                     let item = DispatchWorkItem { [state] in
                         state.withLock { runState in
-                            guard !runState.isFinished else { return }
+                            guard !runState.isFinished, runState.isLaunched else { return }
                             runState.didTimeout = true
                             runState.process?.terminate()
                         }
@@ -146,15 +146,20 @@ public struct CLICommandRunner: Sendable {
                     return
                 }
 
-                // If the task was already cancelled before we launched,
-                // set the flag and terminate. The terminationHandler
-                // will resume the continuation with processCancelled.
-                if Task.isCancelled {
-                    state.withLock { runState in
-                        guard !runState.isFinished else { return }
+                // Mark as launched and check if cancel/timeout arrived
+                // while we were launching. This closes the race window
+                // between process.run() and the isLaunched flag.
+                let shouldTerminate = state.withLock { runState -> Bool in
+                    runState.isLaunched = true
+                    if runState.isFinished { return false }
+                    if runState.didCancel || Task.isCancelled {
                         runState.didCancel = true
                         runState.timeoutItem?.cancel()
+                        return true
                     }
+                    return false
+                }
+                if shouldTerminate {
                     process.terminate()
                 }
             }
@@ -165,7 +170,9 @@ public struct CLICommandRunner: Sendable {
                 guard !runState.isFinished else { return }
                 runState.didCancel = true
                 runState.timeoutItem?.cancel()
-                runState.process?.terminate()
+                if runState.isLaunched {
+                    runState.process?.terminate()
+                }
             }
         }
     }
@@ -194,7 +201,7 @@ public struct CLICommandRunner: Sendable {
     /// ``CoreError/processNonZeroExit(executablePath:exitCode:stderr:)``.
     public func stream(_ request: CommandRequest) -> AsyncThrowingStream<Data, Error> {
         AsyncThrowingStream { continuation in
-            let processLock = OSAllocatedUnfairLock<Process?>(initialState: nil)
+            let processLock = OSAllocatedUnfairLock(initialState: StreamProcessState())
 
             let task = Task {
                 let process = Process()
@@ -218,7 +225,7 @@ public struct CLICommandRunner: Sendable {
                 process.standardOutput = stdoutPipe
                 process.standardError = stderrPipe
 
-                processLock.withLock { $0 = process }
+                processLock.withLock { $0.process = process }
 
                 let stdoutHandle = stdoutPipe.fileHandleForReading
 
@@ -231,6 +238,8 @@ public struct CLICommandRunner: Sendable {
                     ))
                     return
                 }
+
+                processLock.withLock { $0.isLaunched = true }
 
                 // Yield stdout chunks in a loop.
                 while true {
@@ -261,8 +270,8 @@ public struct CLICommandRunner: Sendable {
 
             continuation.onTermination = { _ in
                 task.cancel()
-                processLock.withLock { process in
-                    if let p = process, p.isRunning {
+                processLock.withLock { state in
+                    if let p = state.process, state.isLaunched, p.isRunning {
                         p.terminate()
                     }
                 }
@@ -278,7 +287,15 @@ public struct CLICommandRunner: Sendable {
 private struct ProcessRunState: Sendable {
     nonisolated(unsafe) var process: Process?
     nonisolated(unsafe) var timeoutItem: DispatchWorkItem?
+    var isLaunched: Bool = false
     var isFinished: Bool = false
     var didTimeout: Bool = false
     var didCancel: Bool = false
+}
+
+/// Mutable state shared between the stream task and the onTermination
+/// handler during a `stream()` call.
+private struct StreamProcessState: Sendable {
+    nonisolated(unsafe) var process: Process?
+    var isLaunched: Bool = false
 }

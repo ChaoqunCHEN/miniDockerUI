@@ -41,12 +41,15 @@ public struct LogStreamParser: Sendable {
             )
         }
 
+        let (stripped, spans) = ANSIParser.parse(message)
+
         return LogEntry(
             engineContextId: engineContextId,
             containerId: containerId,
             stream: defaultStream,
             timestamp: timestamp,
-            message: message
+            message: stripped,
+            styledSpans: spans
         )
     }
 

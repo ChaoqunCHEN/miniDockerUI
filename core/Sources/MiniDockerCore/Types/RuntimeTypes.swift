@@ -243,20 +243,25 @@ public struct LogEntry: Sendable, Codable, Equatable {
     public let containerId: String
     public let stream: LogStream
     public let timestamp: Date
+    /// The visible (ANSI-stripped) message text.
     public let message: String
+    /// Styled text spans parsed from ANSI codes, `nil` when no ANSI codes were present.
+    public let styledSpans: [ANSITextSpan]?
 
     public init(
         engineContextId: String,
         containerId: String,
         stream: LogStream,
         timestamp: Date,
-        message: String
+        message: String,
+        styledSpans: [ANSITextSpan]? = nil
     ) {
         self.engineContextId = engineContextId
         self.containerId = containerId
         self.stream = stream
         self.timestamp = timestamp
         self.message = message
+        self.styledSpans = styledSpans
     }
 }
 
