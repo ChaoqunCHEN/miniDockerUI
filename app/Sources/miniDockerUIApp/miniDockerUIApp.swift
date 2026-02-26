@@ -18,10 +18,14 @@ struct MiniDockerUIApp: App {
             flushHz: 30
         )
         let logBuffer = LogRingBuffer(policy: policy)
+        let composeExecutor = CLIComposeAdapter()
+        let worktreeViewModel = ComposeWorktreeViewModel(gitAdapter: GitCLIAdapter())
         _viewModel = State(initialValue: AppViewModel(
             engine: CLIEngineAdapter(),
             settingsStore: store,
-            logBuffer: logBuffer
+            logBuffer: logBuffer,
+            composeExecutor: composeExecutor,
+            worktreeViewModel: worktreeViewModel
         ))
     }
 

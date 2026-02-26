@@ -31,6 +31,8 @@
 	W5W00001000000000000000B /* WorktreeSwitchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5W00001000000000000000F /* WorktreeSwitchViewModel.swift */; };
 	W5W00002000000000000000B /* WorktreeSwitchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5W00002000000000000000F /* WorktreeSwitchView.swift */; };
 	W5W00003000000000000000B /* WorktreeMappingRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5W00003000000000000000F /* WorktreeMappingRow.swift */; };
+	W5W00004000000000000000B /* ComposeWorktreeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5W00004000000000000000F /* ComposeWorktreeViewModel.swift */; };
+	W5W00005000000000000000B /* WorktreePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5W00005000000000000000F /* WorktreePickerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -59,6 +61,8 @@
 	W5W00001000000000000000F /* WorktreeSwitchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeSwitchViewModel.swift; sourceTree = "<group>"; };
 	W5W00002000000000000000F /* WorktreeSwitchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeSwitchView.swift; sourceTree = "<group>"; };
 	W5W00003000000000000000F /* WorktreeMappingRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeMappingRow.swift; sourceTree = "<group>"; };
+	W5W00004000000000000000F /* ComposeWorktreeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeWorktreeViewModel.swift; sourceTree = "<group>"; };
+	W5W00005000000000000000F /* WorktreePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreePickerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -219,6 +223,7 @@
 		isa = PBXGroup;
 		children = (
 			W5W00001000000000000000F /* WorktreeSwitchViewModel.swift */,
+			W5W00004000000000000000F /* ComposeWorktreeViewModel.swift */,
 		);
 		path = ViewModels;
 		sourceTree = "<group>";
@@ -228,6 +233,7 @@
 		children = (
 			W5W00002000000000000000F /* WorktreeSwitchView.swift */,
 			W5W00003000000000000000F /* WorktreeMappingRow.swift */,
+			W5W00005000000000000000F /* WorktreePickerView.swift */,
 		);
 		path = Views;
 		sourceTree = "<group>";
@@ -337,6 +343,8 @@
 			W5W00001000000000000000B /* WorktreeSwitchViewModel.swift in Sources */,
 			W5W00002000000000000000B /* WorktreeSwitchView.swift in Sources */,
 			W5W00003000000000000000B /* WorktreeMappingRow.swift in Sources */,
+			W5W00004000000000000000B /* ComposeWorktreeViewModel.swift in Sources */,
+			W5W00005000000000000000B /* WorktreePickerView.swift in Sources */,
 		);
 		runOnlyForDeploymentPostprocessing = 0;
 	};
