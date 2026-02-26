@@ -11,6 +11,7 @@ struct ReadinessTrackerView: View {
                 ruleConfigurationSection
                 evaluationDetailsSection
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
         }
         .task {
@@ -39,7 +40,9 @@ struct ReadinessTrackerView: View {
                 .disabled(viewModel.isEvaluating)
             }
             .padding(.vertical, 4)
+            .padding(.horizontal, 4)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var readinessBadge: some View {
@@ -75,8 +78,11 @@ struct ReadinessTrackerView: View {
                 }
                 windowPolicyPicker
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 4)
+            .padding(.horizontal, 4)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var modePicker: some View {
@@ -113,35 +119,47 @@ struct ReadinessTrackerView: View {
     private var evaluationDetailsSection: some View {
         GroupBox("Evaluation Details") {
             if let result = viewModel.result {
-                VStack(alignment: .leading, spacing: 6) {
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
                     detailRow(label: "Health Satisfied", value: result.healthSatisfied ? "Yes" : "No")
                     detailRow(label: "Regex Matches", value: "\(result.regexMatchCount)")
                     detailRow(label: "Evaluated Entries", value: "\(result.evaluatedEntries)")
                     detailRow(label: "Rejected Stale", value: "\(result.rejectedStaleEntries)")
                 }
                 .padding(.vertical, 4)
+                .padding(.horizontal, 4)
             } else {
                 Text("No evaluation results yet.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 4)
+                    .padding(.horizontal, 4)
             }
 
             if let error = viewModel.errorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .padding(.top, 4)
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .font(.caption)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+                .padding(.top, 4)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func detailRow(label: String, value: String) -> some View {
-        HStack {
+        GridRow {
             Text(label)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Spacer()
+                .gridColumnAlignment(.leading)
             Text(value)
                 .font(.subheadline)
                 .fontWeight(.medium)

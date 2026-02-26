@@ -3,11 +3,12 @@ import SwiftUI
 
 struct EnhancedLogView: View {
     let detailViewModel: ContainerDetailViewModel
+    @Binding var isSearchVisible: Bool
     @State private var searchViewModel: LogSearchViewModel
-    @State private var isSearchVisible: Bool = false
 
-    init(detailViewModel: ContainerDetailViewModel) {
+    init(detailViewModel: ContainerDetailViewModel, isSearchVisible: Binding<Bool>) {
         self.detailViewModel = detailViewModel
+        _isSearchVisible = isSearchVisible
         _searchViewModel = State(initialValue: LogSearchViewModel(
             buffer: detailViewModel.logBuffer,
             containerId: detailViewModel.containerId
@@ -18,6 +19,7 @@ struct EnhancedLogView: View {
         VStack(spacing: 0) {
             if isSearchVisible {
                 LogSearchBarView(viewModel: searchViewModel)
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 Divider()
             }
 
@@ -26,18 +28,10 @@ struct EnhancedLogView: View {
             Divider()
             statusBar
         }
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    isSearchVisible.toggle()
-                    if !isSearchVisible {
-                        searchViewModel.clearSearch()
-                    }
-                } label: {
-                    Label("Search", systemImage: "magnifyingglass")
-                }
-                .help("Toggle search bar")
-                .keyboardShortcut("f", modifiers: .command)
+        .animation(.easeInOut(duration: 0.15), value: isSearchVisible)
+        .onChange(of: isSearchVisible) { _, visible in
+            if !visible {
+                searchViewModel.clearSearch()
             }
         }
     }
@@ -47,7 +41,7 @@ struct EnhancedLogView: View {
     private var logContent: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 1) {
+                LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(
                         Array(detailViewModel.displayEntries.enumerated()),
                         id: \.offset
@@ -99,7 +93,7 @@ struct EnhancedLogView: View {
                 .textSelection(.enabled)
         }
         .padding(.vertical, 1)
-        .background(isHighlighted ? Color.yellow.opacity(0.2) : Color.clear)
+        .background(isHighlighted ? Color.yellow.opacity(0.35) : Color.clear)
     }
 
     private func isEntryHighlighted(_ entry: LogEntry) -> Bool {

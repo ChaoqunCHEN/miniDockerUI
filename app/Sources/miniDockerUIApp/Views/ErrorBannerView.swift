@@ -9,7 +9,7 @@ struct ErrorBannerView: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.yellow)
+                .foregroundStyle(.red)
             Text(message)
                 .font(.caption)
                 .lineLimit(2)
