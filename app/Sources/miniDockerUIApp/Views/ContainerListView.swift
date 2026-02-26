@@ -46,7 +46,6 @@ struct ContainerListView: View {
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
-                .disabled(viewModel.isLoading)
                 .keyboardShortcut("r", modifiers: .command)
                 .help("Refresh container list")
             }

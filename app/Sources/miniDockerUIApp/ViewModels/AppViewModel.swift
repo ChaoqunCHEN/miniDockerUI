@@ -19,6 +19,7 @@ final class AppViewModel {
     var actionInProgress: [String: ContainerAction] = [:]
 
     private var eventStreamTask: Task<Void, Never>?
+    private var pendingReloadTask: Task<Void, Never>?
     private var detailViewModels: [String: ContainerDetailViewModel] = [:]
 
     init(
@@ -94,13 +95,15 @@ final class AppViewModel {
 
     func loadContainers() async {
         isLoading = true
-        errorMessage = nil
         do {
             containers = try await engine.listContainers()
             evictStaleDetailViewModels()
             await worktreeViewModel.detectAndLoadWorktrees(from: containers)
+            errorMessage = nil
         } catch {
-            errorMessage = "Failed to list containers: \(error.localizedDescription)"
+            if !Task.isCancelled {
+                errorMessage = "Failed to list containers: \(error.localizedDescription)"
+            }
         }
         isLoading = false
     }
@@ -170,6 +173,17 @@ final class AppViewModel {
 
     // MARK: - Event Stream
 
+    /// Debounce event-driven reloads so bursts of Docker events
+    /// (e.g. start + attach + connect) collapse into a single reload.
+    private func scheduleReload() {
+        pendingReloadTask?.cancel()
+        pendingReloadTask = Task {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s debounce
+            guard !Task.isCancelled else { return }
+            await loadContainers()
+        }
+    }
+
     func startEventStream() {
         guard eventStreamTask == nil else { return }
         eventStreamTask = Task { [weak self] in
@@ -182,7 +196,7 @@ final class AppViewModel {
                 guard let self else { return }
                 do {
                     for try await _ in engine.streamEvents(since: Date()) {
-                        await loadContainers()
+                        scheduleReload()
                     }
                     // Stream ended cleanly — reset backoff and reconnect immediately
                     retryDelay = 1_000_000_000
@@ -205,5 +219,7 @@ final class AppViewModel {
     func stopEventStream() {
         eventStreamTask?.cancel()
         eventStreamTask = nil
+        pendingReloadTask?.cancel()
+        pendingReloadTask = nil
     }
 }
