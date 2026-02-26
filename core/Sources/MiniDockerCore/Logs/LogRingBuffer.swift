@@ -123,12 +123,19 @@ public final class LogRingBuffer: Sendable {
 
     // MARK: - Byte Cost
 
-    /// Compute the byte cost of a single log entry.
+    /// Estimated overhead per ``ANSITextSpan`` (style struct + heap allocation).
+    private static let spanOverhead = 16
+
+    /// Compute the estimated byte cost of a single log entry.
     static func byteCost(of entry: LogEntry) -> Int {
-        entry.message.utf8.count
+        var cost = entry.message.utf8.count
             + entry.containerId.utf8.count
             + entry.engineContextId.utf8.count
-            + 64
+            + 64 // fixed overhead for Date, stream enum, pointers
+        if let spans = entry.styledSpans {
+            cost += spans.reduce(0) { $0 + $1.text.utf8.count + spanOverhead }
+        }
+        return cost
     }
 
     // MARK: - Private

@@ -31,6 +31,10 @@ struct SelectableLogTextView: NSViewRepresentable {
         var lastHighlightedSelectedIndex: Int?
         var lastRenderedCountForHighlights: Int = 0
 
+        /// Cached entry lookup dictionary, rebuilt only when entries change.
+        var cachedEntryLookup: [EntryKey: Int] = [:]
+        var cachedEntryLookupCount: Int = 0
+
         func resetHighlightState() {
             lastHighlightedResultCount = 0
             lastHighlightedSelectedIndex = nil
@@ -134,7 +138,7 @@ struct SelectableLogTextView: NSViewRepresentable {
 
         updateTextContent(textStorage: textStorage, coordinator: coordinator)
 
-        let entryLookup = searchResults.isEmpty ? [:] : buildEntryLookup()
+        let entryLookup = searchResults.isEmpty ? [:] : buildEntryLookup(coordinator: coordinator)
 
         applySearchHighlights(textView: textView, coordinator: coordinator, entryLookup: entryLookup)
 
@@ -169,6 +173,7 @@ struct SelectableLogTextView: NSViewRepresentable {
                 coordinator.entryOffsets = [0]
                 coordinator.firstEntryTimestamp = nil
                 coordinator.firstEntryMessage = nil
+                coordinator.cachedEntryLookupCount = 0
                 coordinator.resetHighlightState()
             }
             return
@@ -208,6 +213,7 @@ struct SelectableLogTextView: NSViewRepresentable {
             coordinator.entryOffsets = offsets
             coordinator.firstEntryTimestamp = displayEntries[0].timestamp
             coordinator.firstEntryMessage = displayEntries[0].message
+            coordinator.cachedEntryLookupCount = 0
             coordinator.resetHighlightState()
         }
 
@@ -243,21 +249,62 @@ struct SelectableLogTextView: NSViewRepresentable {
         let result = NSMutableAttributedString()
 
         for entry in entries {
-            let msgAttrs = entry.stream == .stderr ? stderrAttributes : stdoutAttributes
-            let msgStr = NSAttributedString(string: entry.message + "\n", attributes: msgAttrs)
+            let isStderr = entry.stream == .stderr
 
-            result.append(msgStr)
+            if let spans = entry.styledSpans {
+                result.append(buildStyledEntry(spans: spans, isStderr: isStderr))
+            } else {
+                let attrs = isStderr ? stderrAttributes : stdoutAttributes
+                result.append(NSAttributedString(string: entry.message + "\n", attributes: attrs))
+            }
 
-            let currentOffset = (entryOffsets.last ?? 0) + msgStr.length
+            let currentOffset = (entryOffsets.last ?? 0) + entry.message.utf16.count + 1
             entryOffsets.append(currentOffset)
         }
 
         return result
     }
 
+    /// Build an attributed string for a single entry that has ANSI styled spans.
+    private static func buildStyledEntry(
+        spans: [ANSITextSpan],
+        isStderr: Bool
+    ) -> NSAttributedString {
+        let entryStr = NSMutableAttributedString()
+
+        for span in spans {
+            let attrs = ANSIColorMapper.attributes(
+                for: span.style,
+                paragraphStyle: paragraphStyle
+            )
+            entryStr.append(NSAttributedString(string: span.text, attributes: attrs))
+        }
+
+        // For stderr, replace default foreground with red using the marker attribute
+        if isStderr {
+            let markerKey = ANSIColorMapper.isDefaultForegroundKey
+            let fullRange = NSRange(location: 0, length: entryStr.length)
+            entryStr.enumerateAttribute(markerKey, in: fullRange) { value, range, _ in
+                if value != nil {
+                    entryStr.addAttribute(.foregroundColor, value: NSColor.systemRed, range: range)
+                    entryStr.removeAttribute(markerKey, range: range)
+                }
+            }
+        }
+
+        let newlineAttrs = isStderr ? stderrAttributes : stdoutAttributes
+        entryStr.append(NSAttributedString(string: "\n", attributes: newlineAttrs))
+        return entryStr
+    }
+
     // MARK: - Entry Lookup
 
-    private func buildEntryLookup() -> [EntryKey: Int] {
+    private func buildEntryLookup(coordinator: Coordinator) -> [EntryKey: Int] {
+        if coordinator.cachedEntryLookupCount == displayEntries.count,
+           !coordinator.cachedEntryLookup.isEmpty
+        {
+            return coordinator.cachedEntryLookup
+        }
         var lookup: [EntryKey: Int] = [:]
         lookup.reserveCapacity(displayEntries.count)
         for (i, entry) in displayEntries.enumerated() {
@@ -266,10 +313,16 @@ struct SelectableLogTextView: NSViewRepresentable {
                 lookup[key] = i
             }
         }
+        coordinator.cachedEntryLookup = lookup
+        coordinator.cachedEntryLookupCount = displayEntries.count
         return lookup
     }
 
     // MARK: - Search Highlights
+
+    private static let matchColor = NSColor.systemYellow.withAlphaComponent(0.45)
+    private static let selectedColor = NSColor.systemOrange.withAlphaComponent(0.6)
+    private static let selectedRowColor = NSColor.systemOrange.withAlphaComponent(0.15)
 
     private func applySearchHighlights(
         textView: NSTextView,
@@ -282,18 +335,36 @@ struct SelectableLogTextView: NSViewRepresentable {
 
         let resultCount = searchResults.count
         let selectedIdx = selectedResultIndex
+        let prevSelectedIdx = coordinator.lastHighlightedSelectedIndex
 
         // Skip if nothing changed
         if resultCount == coordinator.lastHighlightedResultCount,
-           selectedIdx == coordinator.lastHighlightedSelectedIndex,
+           selectedIdx == prevSelectedIdx,
            coordinator.renderedEntryCount == coordinator.lastRenderedCountForHighlights
         {
             return
         }
 
-        let fullRange = NSRange(location: 0, length: textStorage.length)
+        // Fast path: only the selected match index changed (no new results, no new entries)
+        let selectionOnlyChanged = resultCount == coordinator.lastHighlightedResultCount
+            && coordinator.renderedEntryCount == coordinator.lastRenderedCountForHighlights
+            && resultCount > 0
 
-        // Clear previous temporary attributes
+        if selectionOnlyChanged {
+            swapSelectedHighlight(
+                layoutManager: layoutManager,
+                textStorage: textStorage,
+                coordinator: coordinator,
+                entryLookup: entryLookup,
+                oldSelectedIdx: prevSelectedIdx,
+                newSelectedIdx: selectedIdx
+            )
+            coordinator.lastHighlightedSelectedIndex = selectedIdx
+            return
+        }
+
+        // Full rebuild: clear and re-apply all highlights
+        let fullRange = NSRange(location: 0, length: textStorage.length)
         layoutManager.removeTemporaryAttribute(.backgroundColor, forCharacterRange: fullRange)
 
         coordinator.lastHighlightedResultCount = resultCount
@@ -302,46 +373,133 @@ struct SelectableLogTextView: NSViewRepresentable {
 
         guard !searchResults.isEmpty else { return }
 
-        let matchColor = NSColor.systemYellow.withAlphaComponent(0.45)
-        let selectedColor = NSColor.systemOrange.withAlphaComponent(0.6)
-        let selectedRowColor = NSColor.systemOrange.withAlphaComponent(0.15)
-
         for (resultIdx, result) in searchResults.enumerated() {
-            guard let entryIdx = entryLookup[EntryKey(result.entry)],
-                  entryIdx + 1 < coordinator.entryOffsets.count
-            else { continue }
+            guard let (entryIdx, entryStart) = resolveEntryPosition(
+                result: result, coordinator: coordinator, entryLookup: entryLookup
+            ) else { continue }
 
-            let entryStart = coordinator.entryOffsets[entryIdx]
             let isSelected = resultIdx == selectedIdx
 
-            // Highlight the full row for the selected match
             if isSelected {
+                applySelectedRowHighlight(
+                    layoutManager: layoutManager,
+                    textStorage: textStorage,
+                    coordinator: coordinator,
+                    entryIdx: entryIdx,
+                    entryStart: entryStart
+                )
+            }
+
+            let color = isSelected ? Self.selectedColor : Self.matchColor
+            applyMatchHighlights(
+                layoutManager: layoutManager,
+                textStorage: textStorage,
+                result: result,
+                entryStart: entryStart,
+                color: color
+            )
+        }
+    }
+
+    /// Swap highlight colors between old and new selected matches without full redraw.
+    private func swapSelectedHighlight(
+        layoutManager: NSLayoutManager,
+        textStorage: NSTextStorage,
+        coordinator: Coordinator,
+        entryLookup: [EntryKey: Int],
+        oldSelectedIdx: Int?,
+        newSelectedIdx: Int?
+    ) {
+        // De-select old match: remove row highlight, revert match color to yellow
+        if let oldIdx = oldSelectedIdx, oldIdx < searchResults.count {
+            let result = searchResults[oldIdx]
+            if let (entryIdx, entryStart) = resolveEntryPosition(result: result, coordinator: coordinator, entryLookup: entryLookup) {
                 let entryEnd = coordinator.entryOffsets[entryIdx + 1]
                 let rowRange = NSRange(location: entryStart, length: entryEnd - entryStart)
                 if rowRange.location + rowRange.length <= textStorage.length {
-                    layoutManager.addTemporaryAttribute(
-                        .backgroundColor,
-                        value: selectedRowColor,
-                        forCharacterRange: rowRange
-                    )
+                    layoutManager.removeTemporaryAttribute(.backgroundColor, forCharacterRange: rowRange)
                 }
-            }
-
-            let color = isSelected ? selectedColor : matchColor
-
-            for matchRange in result.matchRanges {
-                let nsRange = NSRange(matchRange, in: result.entry.message)
-                let adjusted = NSRange(
-                    location: entryStart + nsRange.location,
-                    length: nsRange.length
+                applyMatchHighlights(
+                    layoutManager: layoutManager,
+                    textStorage: textStorage,
+                    result: result,
+                    entryStart: entryStart,
+                    color: Self.matchColor
                 )
-                if adjusted.location + adjusted.length <= textStorage.length {
-                    layoutManager.addTemporaryAttribute(
-                        .backgroundColor,
-                        value: color,
-                        forCharacterRange: adjusted
-                    )
-                }
+            }
+        }
+
+        // Select new match: add row highlight, set match color to orange
+        if let newIdx = newSelectedIdx, newIdx < searchResults.count {
+            let result = searchResults[newIdx]
+            if let (entryIdx, entryStart) = resolveEntryPosition(result: result, coordinator: coordinator, entryLookup: entryLookup) {
+                applySelectedRowHighlight(
+                    layoutManager: layoutManager,
+                    textStorage: textStorage,
+                    coordinator: coordinator,
+                    entryIdx: entryIdx,
+                    entryStart: entryStart
+                )
+                applyMatchHighlights(
+                    layoutManager: layoutManager,
+                    textStorage: textStorage,
+                    result: result,
+                    entryStart: entryStart,
+                    color: Self.selectedColor
+                )
+            }
+        }
+    }
+
+    /// Resolve a search result to its entry index and character offset, or `nil` if not found.
+    private func resolveEntryPosition(
+        result: LogSearchResult,
+        coordinator: Coordinator,
+        entryLookup: [EntryKey: Int]
+    ) -> (entryIdx: Int, entryStart: Int)? {
+        guard let entryIdx = entryLookup[EntryKey(result.entry)],
+              entryIdx + 1 < coordinator.entryOffsets.count
+        else { return nil }
+        return (entryIdx, coordinator.entryOffsets[entryIdx])
+    }
+
+    private func applySelectedRowHighlight(
+        layoutManager: NSLayoutManager,
+        textStorage: NSTextStorage,
+        coordinator: Coordinator,
+        entryIdx: Int,
+        entryStart: Int
+    ) {
+        let entryEnd = coordinator.entryOffsets[entryIdx + 1]
+        let rowRange = NSRange(location: entryStart, length: entryEnd - entryStart)
+        if rowRange.location + rowRange.length <= textStorage.length {
+            layoutManager.addTemporaryAttribute(
+                .backgroundColor,
+                value: Self.selectedRowColor,
+                forCharacterRange: rowRange
+            )
+        }
+    }
+
+    private func applyMatchHighlights(
+        layoutManager: NSLayoutManager,
+        textStorage: NSTextStorage,
+        result: LogSearchResult,
+        entryStart: Int,
+        color: NSColor
+    ) {
+        for matchRange in result.matchRanges {
+            let nsRange = NSRange(matchRange, in: result.entry.message)
+            let adjusted = NSRange(
+                location: entryStart + nsRange.location,
+                length: nsRange.length
+            )
+            if adjusted.location + adjusted.length <= textStorage.length {
+                layoutManager.addTemporaryAttribute(
+                    .backgroundColor,
+                    value: color,
+                    forCharacterRange: adjusted
+                )
             }
         }
     }
@@ -432,12 +590,12 @@ struct SelectableLogTextView: NSViewRepresentable {
 
         let result = searchResults[selectedIdx]
 
-        guard let idx = entryLookup[EntryKey(result.entry)],
-              idx + 1 < coordinator.entryOffsets.count,
-              let firstRange = result.matchRanges.first
+        guard let (_, entryStart) = resolveEntryPosition(
+            result: result, coordinator: coordinator, entryLookup: entryLookup
+        ),
+            let firstRange = result.matchRanges.first
         else { return }
 
-        let entryStart = coordinator.entryOffsets[idx]
         let nsRange = NSRange(firstRange, in: result.entry.message)
         let adjusted = NSRange(
             location: entryStart + nsRange.location,
@@ -450,7 +608,7 @@ struct SelectableLogTextView: NSViewRepresentable {
 
     // MARK: - Entry Lookup Key
 
-    private struct EntryKey: Hashable {
+    struct EntryKey: Hashable {
         let timestamp: Date
         let message: String
 
