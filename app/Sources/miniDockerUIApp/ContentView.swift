@@ -11,11 +11,7 @@ struct ContentView: View {
         } detail: {
             if let selectedId = viewModel.selectedContainerId {
                 ContainerDetailView(
-                    viewModel: ContainerDetailViewModel(
-                        engine: viewModel.engine,
-                        containerId: selectedId,
-                        logBuffer: viewModel.logBuffer
-                    )
+                    viewModel: viewModel.detailViewModel(for: selectedId)
                 )
                 .id(selectedId)
             } else {

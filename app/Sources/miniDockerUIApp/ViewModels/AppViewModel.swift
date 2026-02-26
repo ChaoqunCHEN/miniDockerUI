@@ -17,12 +17,28 @@ final class AppViewModel {
     var actionInProgress: [String: ContainerAction] = [:]
 
     private var eventStreamTask: Task<Void, Never>?
+    private var detailViewModels: [String: ContainerDetailViewModel] = [:]
 
     init(engine: any EngineAdapter, settingsStore: any AppSettingsStore, logBuffer: LogRingBuffer) {
         self.engine = engine
         self.settingsStore = settingsStore
         self.logBuffer = logBuffer
         loadFavorites()
+    }
+
+    // MARK: - Detail ViewModel Cache
+
+    func detailViewModel(for containerId: String) -> ContainerDetailViewModel {
+        if let existing = detailViewModels[containerId] {
+            return existing
+        }
+        let vm = ContainerDetailViewModel(
+            engine: engine,
+            containerId: containerId,
+            logBuffer: logBuffer
+        )
+        detailViewModels[containerId] = vm
+        return vm
     }
 
     // MARK: - Favorites
@@ -45,7 +61,7 @@ final class AppViewModel {
         saveFavorites()
     }
 
-    func loadFavorites() {
+    private func loadFavorites() {
         do {
             let settings = try settingsStore.load()
             favoriteKeys = settings.favoriteContainerKeys
@@ -71,10 +87,19 @@ final class AppViewModel {
         errorMessage = nil
         do {
             containers = try await engine.listContainers()
+            evictStaleDetailViewModels()
         } catch {
             errorMessage = "Failed to list containers: \(error.localizedDescription)"
         }
         isLoading = false
+    }
+
+    private func evictStaleDetailViewModels() {
+        let liveIds = Set(containers.map(\.id))
+        for (id, vm) in detailViewModels where !liveIds.contains(id) {
+            vm.stopLogStream()
+            detailViewModels.removeValue(forKey: id)
+        }
     }
 
     // MARK: - Container Actions
@@ -128,7 +153,7 @@ final class AppViewModel {
                     for try await _ in engine.streamEvents(since: Date()) {
                         await loadContainers()
                     }
-                    // Stream ended cleanly — reset backoff state
+                    // Stream ended cleanly — reset backoff and reconnect immediately
                     retryDelay = 1_000_000_000
                     consecutiveFailures = 0
                 } catch {
@@ -139,9 +164,9 @@ final class AppViewModel {
                         return
                     }
                     errorMessage = "Event stream error: \(error.localizedDescription)"
+                    try? await Task.sleep(nanoseconds: retryDelay)
+                    retryDelay = min(retryDelay * 2, maxDelay)
                 }
-                try? await Task.sleep(nanoseconds: retryDelay)
-                retryDelay = min(retryDelay * 2, maxDelay)
             }
         }
     }

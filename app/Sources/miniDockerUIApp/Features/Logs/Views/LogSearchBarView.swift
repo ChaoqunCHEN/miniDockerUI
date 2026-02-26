@@ -3,6 +3,7 @@ import SwiftUI
 
 struct LogSearchBarView: View {
     @Bindable var viewModel: LogSearchViewModel
+    @FocusState private var isSearchFieldFocused: Bool
 
     var body: some View {
         HStack(spacing: 8) {
@@ -25,6 +26,8 @@ struct LogSearchBarView: View {
                 .foregroundStyle(.secondary)
             TextField("Search logs...", text: $viewModel.queryText)
                 .textFieldStyle(.plain)
+                .focused($isSearchFieldFocused)
+                .onAppear { isSearchFieldFocused = true }
                 .onSubmit { viewModel.search() }
             if !viewModel.queryText.isEmpty {
                 Button {
