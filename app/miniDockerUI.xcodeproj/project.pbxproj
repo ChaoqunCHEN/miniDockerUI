@@ -24,6 +24,8 @@
 	W5L00001000000000000000B /* LogSearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5L00001000000000000000F /* LogSearchViewModel.swift */; };
 	W5L00002000000000000000B /* LogSearchBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5L00002000000000000000F /* LogSearchBarView.swift */; };
 	W5L00003000000000000000B /* EnhancedLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5L00003000000000000000F /* EnhancedLogView.swift */; };
+	W5L00004000000000000000B /* SelectableLogTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5L00004000000000000000F /* SelectableLogTextView.swift */; };
+	W5L00005000000000000000B /* ScrollbarMarkerOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5L00005000000000000000F /* ScrollbarMarkerOverlay.swift */; };
 	W5R00001000000000000000B /* ReadinessViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5R00001000000000000000F /* ReadinessViewModel.swift */; };
 	W5R00002000000000000000B /* ReadinessTrackerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5R00002000000000000000F /* ReadinessTrackerView.swift */; };
 	W5W00001000000000000000B /* WorktreeSwitchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5W00001000000000000000F /* WorktreeSwitchViewModel.swift */; };
@@ -50,6 +52,8 @@
 	W5L00001000000000000000F /* LogSearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogSearchViewModel.swift; sourceTree = "<group>"; };
 	W5L00002000000000000000F /* LogSearchBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogSearchBarView.swift; sourceTree = "<group>"; };
 	W5L00003000000000000000F /* EnhancedLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnhancedLogView.swift; sourceTree = "<group>"; };
+	W5L00004000000000000000F /* SelectableLogTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectableLogTextView.swift; sourceTree = "<group>"; };
+	W5L00005000000000000000F /* ScrollbarMarkerOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollbarMarkerOverlay.swift; sourceTree = "<group>"; };
 	W5R00001000000000000000F /* ReadinessViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadinessViewModel.swift; sourceTree = "<group>"; };
 	W5R00002000000000000000F /* ReadinessTrackerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadinessTrackerView.swift; sourceTree = "<group>"; };
 	W5W00001000000000000000F /* WorktreeSwitchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeSwitchViewModel.swift; sourceTree = "<group>"; };
@@ -171,6 +175,8 @@
 		children = (
 			W5L00002000000000000000F /* LogSearchBarView.swift */,
 			W5L00003000000000000000F /* EnhancedLogView.swift */,
+			W5L00004000000000000000F /* SelectableLogTextView.swift */,
+			W5L00005000000000000000F /* ScrollbarMarkerOverlay.swift */,
 		);
 		path = Views;
 		sourceTree = "<group>";
@@ -324,6 +330,8 @@
 			W5L00001000000000000000B /* LogSearchViewModel.swift in Sources */,
 			W5L00002000000000000000B /* LogSearchBarView.swift in Sources */,
 			W5L00003000000000000000B /* EnhancedLogView.swift in Sources */,
+			W5L00004000000000000000B /* SelectableLogTextView.swift in Sources */,
+			W5L00005000000000000000B /* ScrollbarMarkerOverlay.swift in Sources */,
 			W5R00001000000000000000B /* ReadinessViewModel.swift in Sources */,
 			W5R00002000000000000000B /* ReadinessTrackerView.swift in Sources */,
 			W5W00001000000000000000B /* WorktreeSwitchViewModel.swift in Sources */,
