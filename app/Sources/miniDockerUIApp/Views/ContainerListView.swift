@@ -37,6 +37,9 @@ struct ContainerListView: View {
         }
         .listStyle(.sidebar)
         .toolbar {
+            ToolbarItem(placement: .automatic) {
+                WorktreePickerView(viewModel: viewModel.worktreeViewModel)
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     Task { await viewModel.loadContainers() }

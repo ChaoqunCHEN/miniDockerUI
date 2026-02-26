@@ -8,6 +8,8 @@ final class AppViewModel {
     let engine: any EngineAdapter
     let settingsStore: any AppSettingsStore
     let logBuffer: LogRingBuffer
+    let composeExecutor: any ComposeExecutor
+    let worktreeViewModel: ComposeWorktreeViewModel
 
     var containers: [ContainerSummary] = []
     var selectedContainerId: String?
@@ -19,10 +21,18 @@ final class AppViewModel {
     private var eventStreamTask: Task<Void, Never>?
     private var detailViewModels: [String: ContainerDetailViewModel] = [:]
 
-    init(engine: any EngineAdapter, settingsStore: any AppSettingsStore, logBuffer: LogRingBuffer) {
+    init(
+        engine: any EngineAdapter,
+        settingsStore: any AppSettingsStore,
+        logBuffer: LogRingBuffer,
+        composeExecutor: any ComposeExecutor,
+        worktreeViewModel: ComposeWorktreeViewModel
+    ) {
         self.engine = engine
         self.settingsStore = settingsStore
         self.logBuffer = logBuffer
+        self.composeExecutor = composeExecutor
+        self.worktreeViewModel = worktreeViewModel
         loadFavorites()
     }
 
@@ -88,6 +98,7 @@ final class AppViewModel {
         do {
             containers = try await engine.listContainers()
             evictStaleDetailViewModels()
+            await worktreeViewModel.detectAndLoadWorktrees(from: containers)
         } catch {
             errorMessage = "Failed to list containers: \(error.localizedDescription)"
         }
@@ -117,8 +128,28 @@ final class AppViewModel {
     }
 
     func restartContainer(id: String) async {
-        await performContainerAction(id: id, action: .restart) {
-            try await engine.restartContainer(id: id, timeoutSeconds: nil)
+        if let targetDir = worktreeViewModel.selectedWorktreeDirectory(for: id),
+           let project = worktreeViewModel.projectForContainer(id),
+           let container = containers.first(where: { $0.id == id }),
+           let serviceName = container.labels[ComposeProjectDetector.serviceLabelKey]
+        {
+            // Pass empty configFiles so docker compose auto-discovers from
+            // the new --project-directory. The config paths stored in labels
+            // are absolute paths from the original worktree and would be
+            // incorrect after switching.
+            await performContainerAction(id: id, action: .restart) {
+                try await composeExecutor.recreateService(
+                    projectName: project.projectName,
+                    projectDirectory: targetDir,
+                    configFiles: [],
+                    serviceName: serviceName,
+                    timeoutSeconds: nil
+                )
+            }
+        } else {
+            await performContainerAction(id: id, action: .restart) {
+                try await engine.restartContainer(id: id, timeoutSeconds: nil)
+            }
         }
     }
 

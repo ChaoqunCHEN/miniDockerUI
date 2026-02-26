@@ -46,6 +46,15 @@ public enum CoreError: Error, Sendable, Equatable {
     case schemaMigrationUnsupported(from: String, to: String)
     case schemaDowngradeRejected(current: String, requested: String)
     case keychainOperationFailed(operation: String, osStatus: Int32)
+
+    // MARK: - Compose errors
+
+    case composeRecreationFailed(projectName: String, service: String, stderr: String)
+
+    // MARK: - Git errors
+
+    case gitNotARepository(directory: String)
+    case gitWorktreeListFailed(repoRoot: String, reason: String)
 }
 
 // MARK: - LocalizedError
@@ -91,6 +100,12 @@ extension CoreError: LocalizedError {
             "Schema downgrade from \(current) to \(requested) is not allowed"
         case let .keychainOperationFailed(operation, osStatus):
             "Keychain \(operation) failed (status: \(osStatus))"
+        case let .composeRecreationFailed(projectName, service, stderr):
+            "Failed to recreate service '\(service)' in project '\(projectName)': \(stderr.prefix(200))"
+        case let .gitNotARepository(directory):
+            "'\(directory)' is not inside a git repository"
+        case let .gitWorktreeListFailed(repoRoot, reason):
+            "Failed to list worktrees for '\(repoRoot)': \(reason)"
         }
     }
 }
