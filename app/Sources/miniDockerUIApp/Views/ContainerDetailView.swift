@@ -4,6 +4,7 @@ import SwiftUI
 struct ContainerDetailView: View {
     @State var viewModel: ContainerDetailViewModel
     @State private var selectedTab: DetailTab = .logs
+    @State private var isSearchVisible: Bool = false
 
     enum DetailTab: String, CaseIterable {
         case logs = "Logs"
@@ -28,11 +29,14 @@ struct ContainerDetailView: View {
             .pickerStyle(.segmented)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
+            .background(.bar)
+
+            Divider()
 
             // Tab content
             switch selectedTab {
             case .logs:
-                EnhancedLogView(detailViewModel: viewModel)
+                EnhancedLogView(detailViewModel: viewModel, isSearchVisible: $isSearchVisible)
             case .readiness:
                 ReadinessTrackerView(viewModel: ReadinessViewModel(
                     engine: viewModel.engine,
@@ -43,17 +47,46 @@ struct ContainerDetailView: View {
                 ContainerInspectView(viewModel: viewModel)
             }
         }
+        // Tab-switching keyboard shortcuts
+        .background(
+            Group {
+                Button("") { selectedTab = .logs }
+                    .keyboardShortcut("1", modifiers: .command)
+                Button("") { selectedTab = .readiness }
+                    .keyboardShortcut("2", modifiers: .command)
+                Button("") { selectedTab = .inspect }
+                    .keyboardShortcut("3", modifiers: .command)
+            }
+            .hidden()
+        )
         .toolbar {
-            ToolbarItemGroup {
+            ToolbarItemGroup(placement: .primaryAction) {
                 actionButtons
             }
-            ToolbarItem {
+            ToolbarItem(placement: .destructiveAction) {
                 Button {
                     viewModel.clearLogs()
                 } label: {
                     Label("Clear Logs", systemImage: "trash")
                 }
-                .help("Clear logs")
+                .help("Clear logs (⌘K)")
+                .keyboardShortcut("k", modifiers: .command)
+            }
+            if selectedTab == .logs {
+                ToolbarItem {
+                    Button {
+                        isSearchVisible.toggle()
+                    } label: {
+                        Label("Search", systemImage: "magnifyingglass")
+                    }
+                    .help("Toggle search bar (⌘F)")
+                    .keyboardShortcut("f", modifiers: .command)
+                }
+            }
+        }
+        .onChange(of: selectedTab) { _, tab in
+            if tab != .logs {
+                isSearchVisible = false
             }
         }
         .task {
@@ -101,7 +134,7 @@ struct ContainerDetailView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(.quaternary, in: Capsule())
+        .background(.secondary.opacity(0.15), in: Capsule())
     }
 
     @ViewBuilder
@@ -114,6 +147,7 @@ struct ContainerDetailView: View {
             Label("Start", systemImage: "play.fill")
         }
         .disabled(isRunning)
+        .help("Start container")
 
         Button {
             Task { await viewModel.stopContainer() }
@@ -121,6 +155,8 @@ struct ContainerDetailView: View {
             Label("Stop", systemImage: "stop.fill")
         }
         .disabled(!isRunning)
+        .keyboardShortcut(".", modifiers: .command)
+        .help("Stop container (⌘.)")
 
         Button {
             Task { await viewModel.restartContainer() }
@@ -128,5 +164,6 @@ struct ContainerDetailView: View {
             Label("Restart", systemImage: "arrow.clockwise")
         }
         .disabled(!isRunning)
+        .help("Restart container")
     }
 }

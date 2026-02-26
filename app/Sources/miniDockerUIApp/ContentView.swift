@@ -7,6 +7,7 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             ContainerListView(viewModel: viewModel)
+                .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
         } detail: {
             if let selectedId = viewModel.selectedContainerId {
                 ContainerDetailView(
@@ -21,12 +22,13 @@ struct ContentView: View {
                 EmptyStateView()
             }
         }
-        .overlay(alignment: .bottom) {
+        .safeAreaInset(edge: .bottom) {
             if let error = viewModel.errorMessage {
                 ErrorBannerView(message: error) {
                     viewModel.errorMessage = nil
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.easeInOut(duration: 0.2), value: viewModel.errorMessage)
             }
         }
         .task {

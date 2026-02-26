@@ -41,11 +41,24 @@ struct ContainerInspectView: View {
                     infoRow(label: "Started", value: formatDate(startedAt))
                 }
                 if !detail.summary.labels.isEmpty {
-                    infoRow(
-                        label: "Labels",
-                        value: detail.summary.labels.map { "\($0.key)=\($0.value)" }
-                            .joined(separator: ", ")
-                    )
+                    HStack(alignment: .top) {
+                        Text("Labels")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 120, alignment: .trailing)
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(
+                                Array(detail.summary.labels.sorted(by: { $0.key < $1.key })),
+                                id: \.key
+                            ) { key, value in
+                                Text("\(key) = \(value)")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                    .textSelection(.enabled)
+                            }
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -87,7 +100,7 @@ struct ContainerInspectView: View {
                         HStack(alignment: .top) {
                             Text(mount.source)
                                 .font(.system(size: 11, design: .monospaced))
-                            Text("->")
+                            Text("→")
                                 .foregroundStyle(.secondary)
                             Text(mount.destination)
                                 .font(.system(size: 11, design: .monospaced))
@@ -121,7 +134,8 @@ struct ContainerInspectView: View {
                                 .foregroundStyle(log.exitCode == 0 ? .green : .red)
                             Text(log.output.trimmingCharacters(in: .whitespacesAndNewlines))
                                 .font(.system(size: 11, design: .monospaced))
-                                .lineLimit(1)
+                                .lineLimit(2)
+                                .textSelection(.enabled)
                         }
                     }
                 }
@@ -137,7 +151,9 @@ struct ContainerInspectView: View {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .frame(width: 80, alignment: .trailing)
+                .frame(width: 120, alignment: .trailing)
+                .lineLimit(1)
+                .truncationMode(.middle)
             Text(value)
                 .font(.system(size: 12, design: .monospaced))
                 .textSelection(.enabled)

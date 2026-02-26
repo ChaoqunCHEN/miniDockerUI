@@ -37,13 +37,15 @@ struct ContainerListView: View {
         }
         .listStyle(.sidebar)
         .toolbar {
-            ToolbarItem {
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     Task { await viewModel.loadContainers() }
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .disabled(viewModel.isLoading)
+                .keyboardShortcut("r", modifiers: .command)
+                .help("Refresh container list")
             }
         }
         .overlay {

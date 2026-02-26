@@ -34,6 +34,7 @@ struct LogSearchBarView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .help("Clear search")
             }
         }
         .padding(.horizontal, 8)
@@ -49,7 +50,7 @@ struct LogSearchBarView: View {
             Text("Exact").tag(LogSearchQuery.MatchMode.exact)
         }
         .pickerStyle(.segmented)
-        .frame(width: 180)
+        .help("Search match mode")
     }
 
     private var caseSensitiveToggle: some View {
@@ -58,7 +59,7 @@ struct LogSearchBarView: View {
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
         }
         .toggleStyle(.button)
-        .help("Case sensitive")
+        .help("Case sensitive search")
     }
 
     private var resultCountLabel: some View {
@@ -67,9 +68,15 @@ struct LogSearchBarView: View {
                 ProgressView()
                     .controlSize(.small)
             } else if !viewModel.queryText.isEmpty {
-                Text("\(viewModel.resultCount) match\(viewModel.resultCount == 1 ? "" : "es")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if viewModel.resultCount == 0 {
+                    Text("No matches")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                } else {
+                    Text("\(viewModel.resultCount) match\(viewModel.resultCount == 1 ? "" : "es")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -82,6 +89,8 @@ struct LogSearchBarView: View {
                 Image(systemName: "chevron.up")
             }
             .disabled(viewModel.results.isEmpty)
+            .keyboardShortcut("g", modifiers: [.command, .shift])
+            .help("Previous match (⌘⇧G)")
 
             Button {
                 viewModel.selectNextResult()
@@ -89,6 +98,8 @@ struct LogSearchBarView: View {
                 Image(systemName: "chevron.down")
             }
             .disabled(viewModel.results.isEmpty)
+            .keyboardShortcut("g", modifiers: .command)
+            .help("Next match (⌘G)")
         }
         .buttonStyle(.borderless)
     }

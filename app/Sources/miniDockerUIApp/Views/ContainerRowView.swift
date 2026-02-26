@@ -7,6 +7,8 @@ struct ContainerRowView: View {
     var isActionInProgress: Bool = false
     var onToggleFavorite: (() -> Void)? = nil
 
+    @State private var isHovered = false
+
     var body: some View {
         HStack(spacing: 8) {
             if isActionInProgress {
@@ -32,13 +34,15 @@ struct ContainerRowView: View {
 
             Spacer()
 
-            if let onToggleFavorite {
+            // Show star only when hovered or already favorited — reduces noise at rest
+            if let onToggleFavorite, isFavorite || isHovered {
                 Button(action: onToggleFavorite) {
                     Image(systemName: isFavorite ? "star.fill" : "star")
                         .foregroundStyle(isFavorite ? .yellow : .secondary)
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
+                .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
             }
 
             Text(container.displayStatus)
@@ -46,6 +50,7 @@ struct ContainerRowView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
+        .onHover { isHovered = $0 }
     }
 }
 
