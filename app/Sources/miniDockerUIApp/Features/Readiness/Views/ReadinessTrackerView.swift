@@ -9,16 +9,11 @@ struct ReadinessTrackerView: View {
             VStack(alignment: .leading, spacing: 16) {
                 statusSection
                 ruleConfigurationSection
+                actionSection
                 evaluationDetailsSection
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-        }
-        .task {
-            await viewModel.evaluate()
-        }
-        .onDisappear {
-            viewModel.stopPolling()
         }
     }
 
@@ -26,18 +21,26 @@ struct ReadinessTrackerView: View {
 
     private var statusSection: some View {
         GroupBox("Readiness Status") {
-            HStack {
-                readinessBadge
-                Spacer()
-                if viewModel.isEvaluating {
-                    ProgressView()
-                        .controlSize(.small)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    readinessBadge
+                    Spacer()
+                    if viewModel.isPolling {
+                        HStack(spacing: 4) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Auto-evaluating")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
-                Button("Evaluate") {
-                    Task { await viewModel.evaluate() }
+
+                if viewModel.isLatched {
+                    Label("Latched — state persists until container restarts", systemImage: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(viewModel.isEvaluating)
             }
             .padding(.vertical, 4)
             .padding(.horizontal, 4)
@@ -111,6 +114,35 @@ struct ReadinessTrackerView: View {
             ForEach(ReadinessWindowStartPolicy.allCases, id: \.self) { policy in
                 Text(displayName(for: policy)).tag(policy)
             }
+        }
+    }
+
+    // MARK: - Action Section
+
+    private var actionSection: some View {
+        HStack(spacing: 12) {
+            Button("Save Rule") {
+                viewModel.saveRule()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!viewModel.hasUnsavedChanges)
+            .help("Save the current rule configuration")
+
+            Button("Remove Rule") {
+                viewModel.removeRule()
+            }
+            .buttonStyle(.bordered)
+            .disabled(!viewModel.hasRule)
+            .help("Remove the readiness rule for this container")
+
+            Spacer()
+
+            Button("Test Evaluate") {
+                Task { await viewModel.testEvaluate() }
+            }
+            .buttonStyle(.bordered)
+            .disabled(viewModel.isEvaluating)
+            .help("Run a one-shot evaluation with the current settings")
         }
     }
 

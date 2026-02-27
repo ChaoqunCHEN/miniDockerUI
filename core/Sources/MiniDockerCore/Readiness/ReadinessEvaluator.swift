@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Evaluates container readiness based on health status and/or regex
 /// matching against log entries.
@@ -8,6 +9,11 @@ import Foundation
 /// for computing `windowStart` based on the rule's
 /// ``ReadinessWindowStartPolicy``.
 public struct ReadinessEvaluator: Sendable {
+    /// Thread-safe cache for compiled regular expressions keyed by pattern string.
+    private static let regexCache = OSAllocatedUnfairLock(
+        initialState: [String: NSRegularExpression]()
+    )
+
     public init() {}
 
     /// Evaluate readiness for the given rule and observations.
@@ -81,31 +87,34 @@ public struct ReadinessEvaluator: Sendable {
     ) throws -> ReadinessResult {
         // Short-circuit on healthy
         if healthStatus == .healthy {
-            return ReadinessResult(
-                isReady: true,
-                healthSatisfied: true,
-                regexMatchCount: 0,
-                evaluatedEntries: 0,
-                rejectedStaleEntries: 0
-            )
+            return evaluateHealthOnly(healthStatus: healthStatus)
         }
 
         // Fall back to regex
-        let (matchCount, evaluated, rejected) = try countRegexMatches(
+        return try evaluateRegexOnly(
             rule: rule,
             logEntries: logEntries,
             windowStart: windowStart
         )
-        return ReadinessResult(
-            isReady: matchCount >= rule.mustMatchCount,
-            healthSatisfied: false,
-            regexMatchCount: matchCount,
-            evaluatedEntries: evaluated,
-            rejectedStaleEntries: rejected
-        )
     }
 
     // MARK: - Regex Matching
+
+    private func cachedRegex(for pattern: String) throws -> NSRegularExpression {
+        if let cached = Self.regexCache.withLock({ $0[pattern] }) {
+            return cached
+        }
+        do {
+            let regex = try NSRegularExpression(pattern: pattern)
+            Self.regexCache.withLock { $0[pattern] = regex }
+            return regex
+        } catch {
+            throw CoreError.contractViolation(
+                expected: "valid regex pattern",
+                actual: "invalid pattern: \(pattern)"
+            )
+        }
+    }
 
     private func countRegexMatches(
         rule: ReadinessRule,
@@ -116,15 +125,7 @@ public struct ReadinessEvaluator: Sendable {
             return (0, 0, 0)
         }
 
-        let regex: NSRegularExpression
-        do {
-            regex = try NSRegularExpression(pattern: pattern)
-        } catch {
-            throw CoreError.contractViolation(
-                expected: "valid regex pattern",
-                actual: "invalid pattern: \(pattern)"
-            )
-        }
+        let regex = try cachedRegex(for: pattern)
 
         var matchCount = 0
         var evaluated = 0

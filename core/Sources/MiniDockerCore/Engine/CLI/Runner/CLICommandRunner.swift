@@ -221,9 +221,19 @@ public struct CLICommandRunner: Sendable {
                 let process = Self.makeProcess(for: request)
 
                 let stdoutPipe = Pipe()
-                let stderrPipe = Pipe()
                 process.standardOutput = stdoutPipe
-                process.standardError = stderrPipe
+
+                // When mergeStderr is true, redirect stderr into the same
+                // pipe so both streams are yielded together to the caller.
+                let stderrPipe: Pipe?
+                if request.mergeStderr {
+                    process.standardError = stdoutPipe
+                    stderrPipe = nil
+                } else {
+                    let separate = Pipe()
+                    process.standardError = separate
+                    stderrPipe = separate
+                }
 
                 let stdoutHandle = stdoutPipe.fileHandleForReading
                 processLock.withLock { $0.process = process }
@@ -242,13 +252,16 @@ public struct CLICommandRunner: Sendable {
 
                 // Read stderr on a background thread so the FD is read
                 // while still valid (same pattern as run() fix).
+                // Skipped when stderr is merged into stdout.
                 let stderrGroup = DispatchGroup()
                 let stderrResult = OSAllocatedUnfairLock(initialState: Data())
-                stderrGroup.enter()
-                DispatchQueue.global().async {
-                    let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                    stderrResult.withLock { $0 = data }
-                    stderrGroup.leave()
+                if let stderrPipe {
+                    stderrGroup.enter()
+                    DispatchQueue.global().async {
+                        let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                        stderrResult.withLock { $0 = data }
+                        stderrGroup.leave()
+                    }
                 }
 
                 // Yield stdout chunks in a loop.
@@ -274,9 +287,12 @@ public struct CLICommandRunner: Sendable {
                 process.waitUntilExit()
 
                 // Wait for stderr read to complete (bridged for async context).
-                await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-                    stderrGroup.notify(queue: .global()) {
-                        cont.resume()
+                // Skipped when stderr is merged (no separate reader).
+                if stderrPipe != nil {
+                    await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                        stderrGroup.notify(queue: .global()) {
+                            cont.resume()
+                        }
                     }
                 }
 

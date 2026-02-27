@@ -8,6 +8,8 @@ final class ContainerDetailViewModel {
     let engine: any EngineAdapter
     let containerId: String
     let logBuffer: LogRingBuffer
+    let readinessManager: ReadinessManager
+    let containerKey: String
 
     var detail: ContainerDetail?
     var displayEntries: [LogEntry] = []
@@ -19,11 +21,35 @@ final class ContainerDetailViewModel {
     private var logStreamTask: Task<Void, Never>?
     private var flushTask: Task<Void, Never>?
     private var logsSince: Date?
+    private var _readinessViewModel: ReadinessViewModel?
 
-    init(engine: any EngineAdapter, containerId: String, logBuffer: LogRingBuffer) {
+    /// Cached readiness view model — created once per container detail session
+    /// to avoid discarding editing state on every SwiftUI body re-evaluation.
+    var readinessViewModel: ReadinessViewModel {
+        if let existing = _readinessViewModel {
+            return existing
+        }
+        let vm = ReadinessViewModel(
+            readinessManager: readinessManager,
+            containerId: containerId,
+            containerKey: containerKey
+        )
+        _readinessViewModel = vm
+        return vm
+    }
+
+    init(
+        engine: any EngineAdapter,
+        containerId: String,
+        logBuffer: LogRingBuffer,
+        readinessManager: ReadinessManager,
+        containerKey: String
+    ) {
         self.engine = engine
         self.containerId = containerId
         self.logBuffer = logBuffer
+        self.readinessManager = readinessManager
+        self.containerKey = containerKey
     }
 
     // MARK: - Actions

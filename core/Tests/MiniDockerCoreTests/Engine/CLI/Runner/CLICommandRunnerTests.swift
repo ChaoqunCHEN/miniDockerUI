@@ -154,4 +154,37 @@ final class CLICommandRunnerTests: XCTestCase {
         XCTAssertTrue(output.contains("line1"))
         XCTAssertTrue(output.contains("line2"))
     }
+
+    func testStreamMergesStderrWhenFlagIsTrue() async throws {
+        let request = CommandRequest(
+            executablePath: "/bin/sh",
+            arguments: ["-c", "echo stdout_msg; echo stderr_msg >&2"],
+            mergeStderr: true
+        )
+
+        var collectedData = Data()
+        for try await chunk in runner.stream(request) {
+            collectedData.append(chunk)
+        }
+
+        let output = String(data: collectedData, encoding: .utf8) ?? ""
+        XCTAssertTrue(output.contains("stdout_msg"), "Expected stdout content in merged stream")
+        XCTAssertTrue(output.contains("stderr_msg"), "Expected stderr content in merged stream")
+    }
+
+    func testStreamOmitsStderrByDefault() async throws {
+        let request = CommandRequest(
+            executablePath: "/bin/sh",
+            arguments: ["-c", "echo stdout_only; echo stderr_only >&2"]
+        )
+
+        var collectedData = Data()
+        for try await chunk in runner.stream(request) {
+            collectedData.append(chunk)
+        }
+
+        let output = String(data: collectedData, encoding: .utf8) ?? ""
+        XCTAssertTrue(output.contains("stdout_only"), "Expected stdout content")
+        XCTAssertFalse(output.contains("stderr_only"), "Stderr should not appear without mergeStderr")
+    }
 }

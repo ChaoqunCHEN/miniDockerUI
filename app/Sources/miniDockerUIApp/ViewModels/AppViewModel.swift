@@ -24,6 +24,7 @@ final class AppViewModel {
     let logBuffer: LogRingBuffer
     let composeExecutor: any ComposeExecutor
     let worktreeViewModel: ComposeWorktreeViewModel
+    let readinessManager: ReadinessManager
 
     var containers: [ContainerSummary] = []
     var selectedContainerId: String?
@@ -48,6 +49,11 @@ final class AppViewModel {
         self.logBuffer = logBuffer
         self.composeExecutor = composeExecutor
         self.worktreeViewModel = worktreeViewModel
+        readinessManager = ReadinessManager(
+            settingsStore: settingsStore,
+            engine: engine,
+            logBuffer: logBuffer
+        )
         loadFavorites()
     }
 
@@ -57,10 +63,14 @@ final class AppViewModel {
         if let existing = detailViewModels[containerId] {
             return existing
         }
+        let container = containers.first { $0.id == containerId }
+        let key = container.map { self.containerKey(for: $0) } ?? ""
         let vm = ContainerDetailViewModel(
             engine: engine,
             containerId: containerId,
-            logBuffer: logBuffer
+            logBuffer: logBuffer,
+            readinessManager: readinessManager,
+            containerKey: key
         )
         detailViewModels[containerId] = vm
         return vm
@@ -113,6 +123,7 @@ final class AppViewModel {
             containers = try await engine.listContainers()
             evictStaleDetailViewModels()
             await worktreeViewModel.detectAndLoadWorktrees(from: containers)
+            await readinessManager.reconcile(containers: containers)
             currentError = nil
         } catch {
             if !Task.isCancelled {
@@ -251,6 +262,7 @@ final class AppViewModel {
         eventStreamTask = nil
         pendingReloadTask?.cancel()
         pendingReloadTask = nil
+        readinessManager.stopAllPolling()
     }
 
     /// Stop the event stream, reload containers, and restart the event stream.

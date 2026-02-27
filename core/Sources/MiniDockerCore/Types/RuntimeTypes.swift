@@ -440,6 +440,17 @@ public extension AppSettings {
             transientUIPreferences: transientUIPreferences
         )
     }
+
+    func with(readinessRules: [String: ReadinessRule]) -> AppSettings {
+        AppSettings(
+            schemaVersion: schemaVersion,
+            favoriteContainerKeys: favoriteContainerKeys,
+            actionPreferences: actionPreferences,
+            worktreeMappings: worktreeMappings,
+            readinessRules: readinessRules,
+            transientUIPreferences: transientUIPreferences
+        )
+    }
 }
 
 public typealias AppSettingsSnapshot = AppSettings
