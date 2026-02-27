@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ErrorBannerView: View {
     let message: String
+    var isPersistent: Bool = false
+    var onRetry: (() -> Void)?
     let onDismiss: () -> Void
 
     @State private var autoDismissTask: Task<Void, Never>?
@@ -12,11 +14,19 @@ struct ErrorBannerView: View {
                 .foregroundStyle(.red)
             Text(message)
                 .font(.caption)
-                .lineLimit(2)
+                .lineLimit(3)
+                .textSelection(.enabled)
             Spacer()
-            Button {
-                onDismiss()
-            } label: {
+            if let onRetry {
+                Button(action: onRetry) {
+                    Text("Retry")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            Button(action: onDismiss) {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.secondary)
             }
@@ -27,6 +37,7 @@ struct ErrorBannerView: View {
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
         .onAppear {
+            guard !isPersistent else { return }
             autoDismissTask = Task {
                 do {
                     try await Task.sleep(for: .seconds(8))

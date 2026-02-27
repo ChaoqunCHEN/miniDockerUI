@@ -19,20 +19,28 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if let error = viewModel.errorMessage {
-                ErrorBannerView(message: error) {
-                    viewModel.errorMessage = nil
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(.easeInOut(duration: 0.2), value: viewModel.errorMessage)
+            if let error = viewModel.currentError {
+                errorBanner(for: error)
             }
         }
         .task {
-            await viewModel.loadContainers()
-            viewModel.startEventStream()
+            await viewModel.refreshAndReconnect()
         }
         .onDisappear {
             viewModel.stopEventStream()
         }
+    }
+
+    private func errorBanner(for error: AppError) -> some View {
+        ErrorBannerView(
+            message: error.message,
+            isPersistent: error.isPersistent,
+            onRetry: error.isPersistent
+                ? { Task { await viewModel.refreshAndReconnect() } }
+                : nil,
+            onDismiss: { viewModel.currentError = nil }
+        )
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .animation(.easeInOut(duration: 0.2), value: viewModel.currentError)
     }
 }

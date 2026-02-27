@@ -2,6 +2,20 @@ import MiniDockerCore
 import Observation
 import SwiftUI
 
+struct AppError: Equatable {
+    let id: UUID
+    let message: String
+    let isPersistent: Bool
+
+    static func transient(_ message: String) -> AppError {
+        AppError(id: UUID(), message: message, isPersistent: false)
+    }
+
+    static func persistent(_ message: String) -> AppError {
+        AppError(id: UUID(), message: message, isPersistent: true)
+    }
+}
+
 @MainActor
 @Observable
 final class AppViewModel {
@@ -14,7 +28,7 @@ final class AppViewModel {
     var containers: [ContainerSummary] = []
     var selectedContainerId: String?
     var isLoading: Bool = false
-    var errorMessage: String?
+    var currentError: AppError?
     var favoriteKeys: Set<String> = []
     var actionInProgress: [String: ContainerAction] = [:]
 
@@ -77,7 +91,7 @@ final class AppViewModel {
             let settings = try settingsStore.load()
             favoriteKeys = settings.favoriteContainerKeys
         } catch {
-            errorMessage = "Failed to load settings: \(error.localizedDescription)"
+            currentError = .transient("Failed to load settings: \(error.localizedDescription)")
         }
     }
 
@@ -87,7 +101,7 @@ final class AppViewModel {
             settings = settings.with(favoriteContainerKeys: favoriteKeys)
             try settingsStore.save(settings)
         } catch {
-            errorMessage = "Failed to save favorites: \(error.localizedDescription)"
+            currentError = .transient("Failed to save favorites: \(error.localizedDescription)")
         }
     }
 
@@ -99,10 +113,12 @@ final class AppViewModel {
             containers = try await engine.listContainers()
             evictStaleDetailViewModels()
             await worktreeViewModel.detectAndLoadWorktrees(from: containers)
-            errorMessage = nil
+            currentError = nil
         } catch {
             if !Task.isCancelled {
-                errorMessage = "Failed to list containers: \(error.localizedDescription)"
+                currentError = .persistent(
+                    "Failed to list containers: \(error.localizedDescription)"
+                )
             }
         }
         isLoading = false
@@ -131,21 +147,16 @@ final class AppViewModel {
     }
 
     func restartContainer(id: String) async {
-        if let targetDir = worktreeViewModel.selectedWorktreeDirectory(for: id),
-           let project = worktreeViewModel.projectForContainer(id),
-           let container = containers.first(where: { $0.id == id }),
-           let serviceName = container.labels[ComposeProjectDetector.serviceLabelKey]
-        {
-            // Pass empty configFiles so docker compose auto-discovers from
-            // the new --project-directory. The config paths stored in labels
-            // are absolute paths from the original worktree and would be
-            // incorrect after switching.
+        if let worktreeRestart = worktreeRestartParams(for: id) {
+            // Recreate through docker compose so the worktree directory switch
+            // takes effect. Config files are omitted so compose auto-discovers
+            // from the new --project-directory.
             await performContainerAction(id: id, action: .restart) {
                 try await composeExecutor.recreateService(
-                    projectName: project.projectName,
-                    projectDirectory: targetDir,
+                    projectName: worktreeRestart.projectName,
+                    projectDirectory: worktreeRestart.directory,
                     configFiles: [],
-                    serviceName: serviceName,
+                    serviceName: worktreeRestart.serviceName,
                     timeoutSeconds: nil
                 )
             }
@@ -167,8 +178,21 @@ final class AppViewModel {
             try await operation()
             await loadContainers()
         } catch {
-            errorMessage = "Failed to \(action.rawValue) container: \(error.localizedDescription)"
+            currentError = .transient(
+                "Failed to \(action.rawValue) container: \(error.localizedDescription)"
+            )
         }
+    }
+
+    private func worktreeRestartParams(for containerId: String) -> (projectName: String, directory: String, serviceName: String)? {
+        guard let directory = worktreeViewModel.selectedWorktreeDirectory(for: containerId),
+              let project = worktreeViewModel.projectForContainer(containerId),
+              let container = containers.first(where: { $0.id == containerId }),
+              let serviceName = container.labels[ComposeProjectDetector.serviceLabelKey]
+        else {
+            return nil
+        }
+        return (project.projectName, directory, serviceName)
     }
 
     // MARK: - Event Stream
@@ -178,7 +202,7 @@ final class AppViewModel {
     private func scheduleReload() {
         pendingReloadTask?.cancel()
         pendingReloadTask = Task {
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s debounce
+            try? await Task.sleep(for: .milliseconds(500))
             guard !Task.isCancelled else { return }
             await loadContainers()
         }
@@ -187,8 +211,10 @@ final class AppViewModel {
     func startEventStream() {
         guard eventStreamTask == nil else { return }
         eventStreamTask = Task { [weak self] in
-            var retryDelay: UInt64 = 1_000_000_000 // 1 second
-            let maxDelay: UInt64 = 30_000_000_000 // 30 seconds
+            defer { self?.eventStreamTask = nil }
+
+            var retryDelay: Duration = .seconds(1)
+            let maxDelay: Duration = .seconds(30)
             var consecutiveFailures = 0
             let maxRetries = 10
 
@@ -198,18 +224,22 @@ final class AppViewModel {
                     for try await _ in engine.streamEvents(since: Date()) {
                         scheduleReload()
                     }
-                    // Stream ended cleanly — reset backoff and reconnect immediately
-                    retryDelay = 1_000_000_000
+                    // Stream ended cleanly -- reset backoff and reconnect immediately
+                    retryDelay = .seconds(1)
                     consecutiveFailures = 0
                 } catch {
                     if Task.isCancelled { return }
                     consecutiveFailures += 1
                     if consecutiveFailures >= maxRetries {
-                        errorMessage = "Docker event stream unreachable after \(maxRetries) retries. Use Refresh to reconnect."
+                        currentError = .persistent(
+                            "Docker event stream unreachable after \(maxRetries) retries. Press Retry to reconnect."
+                        )
                         return
                     }
-                    errorMessage = "Event stream error: \(error.localizedDescription)"
-                    try? await Task.sleep(nanoseconds: retryDelay)
+                    currentError = .transient(
+                        "Event stream error: \(error.localizedDescription)"
+                    )
+                    try? await Task.sleep(for: retryDelay)
                     retryDelay = min(retryDelay * 2, maxDelay)
                 }
             }
@@ -221,5 +251,17 @@ final class AppViewModel {
         eventStreamTask = nil
         pendingReloadTask?.cancel()
         pendingReloadTask = nil
+    }
+
+    /// Stop the event stream, reload containers, and restart the event stream.
+    /// Used as the retry action for persistent errors and the refresh button handler.
+    func refreshAndReconnect() async {
+        let oldTask = eventStreamTask
+        stopEventStream()
+        // Await the old task to ensure it fully exits before restarting,
+        // preventing overlap between old and new event stream tasks.
+        await oldTask?.value
+        await loadContainers()
+        startEventStream()
     }
 }

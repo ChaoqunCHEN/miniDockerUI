@@ -34,21 +34,7 @@ public struct CLICommandRunner: Sendable {
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 // -- Build Process & Pipes --
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: request.executablePath)
-                process.arguments = request.arguments
-
-                if let env = request.environment {
-                    var merged = ProcessInfo.processInfo.environment
-                    for (key, value) in env {
-                        merged[key] = value
-                    }
-                    process.environment = merged
-                }
-
-                if let workDir = request.workingDirectory {
-                    process.currentDirectoryURL = URL(fileURLWithPath: workDir)
-                }
+                let process = Self.makeProcess(for: request)
 
                 let stdoutPipe = Pipe()
                 let stderrPipe = Pipe()
@@ -76,6 +62,28 @@ public struct CLICommandRunner: Sendable {
                     )
                 }
 
+                // -- Read pipes on background threads --
+                // Start reading BEFORE process.run() so the FDs are read
+                // while still valid. The reads complete naturally when the
+                // process exits (write end closes).
+                let pipeGroup = DispatchGroup()
+                let pipeData = OSAllocatedUnfairLock(
+                    initialState: (stdout: Data(), stderr: Data())
+                )
+
+                pipeGroup.enter()
+                DispatchQueue.global().async {
+                    let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+                    pipeData.withLock { $0.stdout = data }
+                    pipeGroup.leave()
+                }
+                pipeGroup.enter()
+                DispatchQueue.global().async {
+                    let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    pipeData.withLock { $0.stderr = data }
+                    pipeGroup.leave()
+                }
+
                 // -- Termination handler (called on process exit) --
                 // This is the ONLY place that resumes the continuation.
                 // The onCancel and timeout handlers just set flags and
@@ -84,8 +92,11 @@ public struct CLICommandRunner: Sendable {
                 process.terminationHandler = { [state] _ in
                     state.withLock { $0.timeoutItem?.cancel() }
 
-                    let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                    let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    // Wait for background pipe reads to finish.
+                    pipeGroup.wait()
+                    let (stdoutData, stderrData) = pipeData.withLock {
+                        ($0.stdout, $0.stderr)
+                    }
 
                     let shouldResume = state.withLock { runState -> Bool in
                         guard !runState.isFinished else { return false }
@@ -135,6 +146,9 @@ public struct CLICommandRunner: Sendable {
                 do {
                     try process.run()
                 } catch {
+                    // Close write ends so background readers unblock.
+                    stdoutPipe.fileHandleForWriting.closeFile()
+                    stderrPipe.fileHandleForWriting.closeFile()
                     state.withLock { runState in
                         runState.timeoutItem?.cancel()
                         runState.isFinished = true
@@ -204,30 +218,15 @@ public struct CLICommandRunner: Sendable {
             let processLock = OSAllocatedUnfairLock(initialState: StreamProcessState())
 
             let task = Task {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: request.executablePath)
-                process.arguments = request.arguments
-
-                if let env = request.environment {
-                    var merged = ProcessInfo.processInfo.environment
-                    for (key, value) in env {
-                        merged[key] = value
-                    }
-                    process.environment = merged
-                }
-
-                if let workDir = request.workingDirectory {
-                    process.currentDirectoryURL = URL(fileURLWithPath: workDir)
-                }
+                let process = Self.makeProcess(for: request)
 
                 let stdoutPipe = Pipe()
                 let stderrPipe = Pipe()
                 process.standardOutput = stdoutPipe
                 process.standardError = stderrPipe
 
-                processLock.withLock { $0.process = process }
-
                 let stdoutHandle = stdoutPipe.fileHandleForReading
+                processLock.withLock { $0.process = process }
 
                 do {
                     try process.run()
@@ -241,42 +240,93 @@ public struct CLICommandRunner: Sendable {
 
                 processLock.withLock { $0.isLaunched = true }
 
+                // Read stderr on a background thread so the FD is read
+                // while still valid (same pattern as run() fix).
+                let stderrGroup = DispatchGroup()
+                let stderrResult = OSAllocatedUnfairLock(initialState: Data())
+                stderrGroup.enter()
+                DispatchQueue.global().async {
+                    let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    stderrResult.withLock { $0 = data }
+                    stderrGroup.leave()
+                }
+
                 // Yield stdout chunks in a loop.
-                while true {
-                    try Task.checkCancellation()
-                    let data = stdoutHandle.availableData
-                    if data.isEmpty {
-                        break
+                do {
+                    while true {
+                        try Task.checkCancellation()
+                        let data = stdoutHandle.availableData
+                        if data.isEmpty {
+                            break
+                        }
+                        continuation.yield(data)
                     }
-                    continuation.yield(data)
+                } catch {
+                    // Cancelled — clean up the process and finish the stream.
+                    if process.isRunning {
+                        process.terminate()
+                    }
+                    continuation.finish(throwing: error)
+                    return
                 }
 
                 // Wait for the process to finish.
                 process.waitUntilExit()
 
-                let exitCode = process.terminationStatus
-                if exitCode != 0 {
-                    let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                    let stderrString = String(data: stderrData, encoding: .utf8) ?? ""
-                    continuation.finish(throwing: CoreError.processNonZeroExit(
-                        executablePath: request.executablePath,
-                        exitCode: exitCode,
-                        stderr: stderrString
-                    ))
-                } else {
-                    continuation.finish()
+                // Wait for stderr read to complete (bridged for async context).
+                await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                    stderrGroup.notify(queue: .global()) {
+                        cont.resume()
+                    }
                 }
+
+                let exitCode = process.terminationStatus
+                guard exitCode != 0 else {
+                    continuation.finish()
+                    return
+                }
+                let stderrData = stderrResult.withLock { $0 }
+                let stderrString = String(data: stderrData, encoding: .utf8) ?? ""
+                continuation.finish(throwing: CoreError.processNonZeroExit(
+                    executablePath: request.executablePath,
+                    exitCode: exitCode,
+                    stderr: stderrString
+                ))
             }
 
             continuation.onTermination = { _ in
                 task.cancel()
                 processLock.withLock { state in
                     if let p = state.process, state.isLaunched, p.isRunning {
+                        // Terminating closes the write end of the pipes,
+                        // which unblocks availableData naturally.
                         p.terminate()
                     }
                 }
             }
         }
+    }
+
+    // MARK: - Private Helpers
+
+    private static func makeProcess(for request: CommandRequest) -> Process {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: request.executablePath)
+        process.arguments = request.arguments
+
+        if let env = request.environment {
+            var merged = ProcessInfo.processInfo.environment
+            for (key, value) in env {
+                merged[key] = value
+            }
+            process.environment = merged
+        }
+
+        if let workDir = request.workingDirectory {
+            process.currentDirectoryURL = URL(fileURLWithPath: workDir)
+        }
+
+        return process
     }
 }
 
