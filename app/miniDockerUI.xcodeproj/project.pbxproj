@@ -29,6 +29,7 @@
 	W5L00006000000000000000B /* ANSIColorMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5L00006000000000000000F /* ANSIColorMapper.swift */; };
 	W5R00001000000000000000B /* ReadinessViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5R00001000000000000000F /* ReadinessViewModel.swift */; };
 	W5R00002000000000000000B /* ReadinessTrackerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5R00002000000000000000F /* ReadinessTrackerView.swift */; };
+	W5R00003000000000000000B /* ReadinessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5R00003000000000000000F /* ReadinessManager.swift */; };
 	W5W00001000000000000000B /* WorktreeSwitchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5W00001000000000000000F /* WorktreeSwitchViewModel.swift */; };
 	W5W00002000000000000000B /* WorktreeSwitchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5W00002000000000000000F /* WorktreeSwitchView.swift */; };
 	W5W00003000000000000000B /* WorktreeMappingRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5W00003000000000000000F /* WorktreeMappingRow.swift */; };
@@ -60,6 +61,7 @@
 	W5L00006000000000000000F /* ANSIColorMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANSIColorMapper.swift; sourceTree = "<group>"; };
 	W5R00001000000000000000F /* ReadinessViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadinessViewModel.swift; sourceTree = "<group>"; };
 	W5R00002000000000000000F /* ReadinessTrackerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadinessTrackerView.swift; sourceTree = "<group>"; };
+	W5R00003000000000000000F /* ReadinessManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadinessManager.swift; sourceTree = "<group>"; };
 	W5W00001000000000000000F /* WorktreeSwitchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeSwitchViewModel.swift; sourceTree = "<group>"; };
 	W5W00002000000000000000F /* WorktreeSwitchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeSwitchView.swift; sourceTree = "<group>"; };
 	W5W00003000000000000000F /* WorktreeMappingRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeMappingRow.swift; sourceTree = "<group>"; };
@@ -209,6 +211,7 @@
 		isa = PBXGroup;
 		children = (
 			W5R00001000000000000000F /* ReadinessViewModel.swift */,
+			W5R00003000000000000000F /* ReadinessManager.swift */,
 		);
 		path = ViewModels;
 		sourceTree = "<group>";
@@ -352,6 +355,7 @@
 			W5L00006000000000000000B /* ANSIColorMapper.swift in Sources */,
 			W5R00001000000000000000B /* ReadinessViewModel.swift in Sources */,
 			W5R00002000000000000000B /* ReadinessTrackerView.swift in Sources */,
+			W5R00003000000000000000B /* ReadinessManager.swift in Sources */,
 			W5W00001000000000000000B /* WorktreeSwitchViewModel.swift in Sources */,
 			W5W00002000000000000000B /* WorktreeSwitchView.swift in Sources */,
 			W5W00003000000000000000B /* WorktreeMappingRow.swift in Sources */,

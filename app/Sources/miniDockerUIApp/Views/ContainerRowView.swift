@@ -5,6 +5,7 @@ struct ContainerRowView: View {
     let container: ContainerSummary
     var isFavorite: Bool = false
     var isActionInProgress: Bool = false
+    var readinessDisplay: String? = nil
     var onToggleFavorite: (() -> Void)? = nil
 
     @State private var isHovered = false
@@ -17,7 +18,7 @@ struct ContainerRowView: View {
                     .frame(width: 8, height: 8)
             } else {
                 Circle()
-                    .fill(container.statusColor.swiftUIColor)
+                    .fill(statusDotColor)
                     .frame(width: 8, height: 8)
             }
 
@@ -45,12 +46,39 @@ struct ContainerRowView: View {
                 .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
             }
 
-            Text(container.displayStatus)
+            Text(statusText)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
         .onHover { isHovered = $0 }
+        .help(statusTooltip)
+    }
+
+    // MARK: - Status Text
+
+    private var statusText: String {
+        if let readinessDisplay { return readinessDisplay }
+        if container.isRunning { return "-" }
+        return container.displayStatus
+    }
+
+    // MARK: - Status Dot Color
+
+    private var statusDotColor: Color {
+        if let display = readinessDisplay, container.isRunning {
+            return display == "Ready" ? .green : .orange
+        }
+        return container.statusColor.swiftUIColor
+    }
+
+    // MARK: - Tooltip
+
+    private var statusTooltip: String {
+        guard let display = readinessDisplay else {
+            return container.displayStatus
+        }
+        return display == "Ready" ? "Container ready" : "Evaluating readiness..."
     }
 }
 

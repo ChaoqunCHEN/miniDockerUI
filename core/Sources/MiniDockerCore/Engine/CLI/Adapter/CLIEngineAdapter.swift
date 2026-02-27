@@ -183,7 +183,7 @@ public struct CLIEngineAdapter: EngineAdapter, Sendable {
         }
         args.append(id)
 
-        let request = CommandRequest(executablePath: dockerPath, arguments: args)
+        let request = CommandRequest(executablePath: dockerPath, arguments: args, mergeStderr: true)
         let dataStream = runner.stream(request)
         let parser = logParser
         let ctxId = engineContextId

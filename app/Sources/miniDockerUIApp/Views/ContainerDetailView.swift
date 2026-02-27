@@ -38,11 +38,7 @@ struct ContainerDetailView: View {
             case .logs:
                 EnhancedLogView(detailViewModel: viewModel, isSearchVisible: $isSearchVisible)
             case .readiness:
-                ReadinessTrackerView(viewModel: ReadinessViewModel(
-                    engine: viewModel.engine,
-                    buffer: viewModel.logBuffer,
-                    containerId: viewModel.containerId
-                ))
+                ReadinessTrackerView(viewModel: viewModel.readinessViewModel)
             case .inspect:
                 ContainerInspectView(viewModel: viewModel)
             }

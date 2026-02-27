@@ -2,49 +2,74 @@ import Foundation
 import MiniDockerCore
 import Observation
 
+/// Thin editing adapter over ``ReadinessManager`` for the readiness detail view.
+///
+/// Local editing state lives here; actual evaluation and persistence is
+/// delegated to the centralized ``ReadinessManager``.
 @MainActor
 @Observable
 final class ReadinessViewModel {
-    private let evaluator: ReadinessEvaluator
-    private let buffer: LogRingBuffer
-    private let engine: any EngineAdapter
+    private let readinessManager: ReadinessManager
     let containerId: String
+    let containerKey: String
 
-    var rule: ReadinessRule?
-    var result: ReadinessResult?
-    var isEvaluating: Bool = false
-    var errorMessage: String?
-    var healthStatus: ContainerHealthStatus?
+    // MARK: - Editing State
 
     var editingMode: ReadinessMode = .healthOnly
     var editingRegexPattern: String = ""
     var editingMustMatchCount: Int = 1
     var editingWindowStartPolicy: ReadinessWindowStartPolicy = .containerStart
 
-    private var evaluationTask: Task<Void, Never>?
+    var isEvaluating: Bool = false
 
     init(
-        engine: any EngineAdapter,
-        buffer: LogRingBuffer,
+        readinessManager: ReadinessManager,
         containerId: String,
-        evaluator: ReadinessEvaluator = ReadinessEvaluator()
+        containerKey: String
     ) {
-        self.engine = engine
-        self.buffer = buffer
+        self.readinessManager = readinessManager
         self.containerId = containerId
-        self.evaluator = evaluator
+        self.containerKey = containerKey
+        loadFromSavedRule()
+    }
+
+    // MARK: - Computed Properties (read from manager)
+
+    var result: ReadinessResult? {
+        readinessManager.containerStates[containerKey]?.result
+    }
+
+    var isLatched: Bool {
+        readinessManager.containerStates[containerKey]?.isLatched ?? false
+    }
+
+    var errorMessage: String? {
+        readinessManager.containerStates[containerKey]?.errorMessage
+    }
+
+    var hasRule: Bool {
+        readinessManager.rules[containerKey] != nil
+    }
+
+    var isPolling: Bool {
+        readinessManager.isPolling(forContainerKey: containerKey)
+    }
+
+    var hasUnsavedChanges: Bool {
+        let defaultRule = ReadinessRule(
+            mode: .healthOnly, regexPattern: nil, mustMatchCount: 1,
+            windowStartPolicy: .containerStart
+        )
+        let savedRule = readinessManager.rules[containerKey] ?? defaultRule
+        return buildRule() != savedRule
     }
 
     // MARK: - Rule Building
 
     func buildRule() -> ReadinessRule {
-        let regexPattern: String?
-        switch editingMode {
-        case .healthOnly:
-            regexPattern = nil
-        case .regexOnly, .healthThenRegex:
-            regexPattern = editingRegexPattern.isEmpty ? nil : editingRegexPattern
-        }
+        // Only include regex pattern for modes that use it
+        let hasRegex = editingMode != .healthOnly && !editingRegexPattern.isEmpty
+        let regexPattern: String? = hasRegex ? editingRegexPattern : nil
 
         return ReadinessRule(
             mode: editingMode,
@@ -54,65 +79,46 @@ final class ReadinessViewModel {
         )
     }
 
-    // MARK: - Evaluation
+    // MARK: - Save / Remove
 
-    func evaluate() async {
+    func saveRule() {
+        let rule = buildRule()
+        readinessManager.saveRule(rule, forContainerKey: containerKey)
+    }
+
+    func removeRule() {
+        readinessManager.removeRule(forContainerKey: containerKey)
+        resetEditingFields()
+    }
+
+    // MARK: - Test Evaluate (one-shot for testing before saving)
+
+    func testEvaluate() async {
         isEvaluating = true
-        errorMessage = nil
-
-        let builtRule = buildRule()
-        rule = builtRule
-
-        do {
-            let detail = try await engine.inspectContainer(id: containerId)
-            healthStatus = detail.healthDetail?.status
-
-            let logEntries = buffer.entries(forContainer: containerId)
-            let windowStart = computeWindowStart(detail: detail)
-
-            result = try evaluator.evaluate(
-                rule: builtRule,
-                healthStatus: healthStatus,
-                logEntries: logEntries,
-                windowStart: windowStart
-            )
-        } catch {
-            errorMessage = "Evaluation failed: \(error.localizedDescription)"
-        }
-
+        let rule = buildRule()
+        await readinessManager.evaluateOnce(
+            containerKey: containerKey,
+            containerId: containerId,
+            rule: rule,
+            force: true
+        )
         isEvaluating = false
     }
 
-    // MARK: - Polling
+    // MARK: - Private
 
-    func startPolling(interval: TimeInterval = 5.0) {
-        stopPolling()
-        let nanoseconds = UInt64(interval * 1_000_000_000)
-        evaluationTask = Task { [weak self] in
-            while !Task.isCancelled {
-                guard let self else { return }
-                await evaluate()
-                try? await Task.sleep(nanoseconds: nanoseconds)
-            }
-        }
+    private func loadFromSavedRule() {
+        guard let rule = readinessManager.rules[containerKey] else { return }
+        editingMode = rule.mode
+        editingRegexPattern = rule.regexPattern ?? ""
+        editingMustMatchCount = rule.mustMatchCount
+        editingWindowStartPolicy = rule.windowStartPolicy
     }
 
-    func stopPolling() {
-        evaluationTask?.cancel()
-        evaluationTask = nil
-    }
-
-    // MARK: - Window Start Computation
-
-    func computeWindowStart(detail: ContainerDetail?) -> Date {
-        switch editingWindowStartPolicy {
-        case .containerStart:
-            return detail?.summary.startedAt ?? Date.distantPast
-        case .actionDispatch:
-            return Date()
-        case .firstLogEntry:
-            let entries = buffer.entries(forContainer: containerId)
-            return entries.first?.timestamp ?? Date.distantPast
-        }
+    private func resetEditingFields() {
+        editingMode = .healthOnly
+        editingRegexPattern = ""
+        editingMustMatchCount = 1
+        editingWindowStartPolicy = .containerStart
     }
 }

@@ -53,6 +53,7 @@ struct ContainerListView: View {
             container: container,
             isFavorite: viewModel.isFavorite(container),
             isActionInProgress: viewModel.actionInProgress[container.id] != nil,
+            readinessDisplay: viewModel.readinessManager.readinessDisplay(for: container),
             onToggleFavorite: { viewModel.toggleFavorite(for: container) }
         )
         .tag(container.id)

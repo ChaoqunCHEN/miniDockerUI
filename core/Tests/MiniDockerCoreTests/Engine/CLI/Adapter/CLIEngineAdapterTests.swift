@@ -272,6 +272,25 @@ final class CLIEngineAdapterTests: XCTestCase {
         XCTAssertEqual(entries[0].message, "Hello from container")
     }
 
+    func testStreamLogsSetsmergeStderrTrue() async throws {
+        mock.streamHandler = { _ in
+            AsyncThrowingStream { $0.finish() }
+        }
+        let options = LogStreamOptions(
+            since: nil,
+            tail: nil,
+            includeStdout: true,
+            includeStderr: true,
+            timestamps: true,
+            follow: false
+        )
+        let stream = adapter.streamLogs(id: "abc123", options: options)
+        for try await _ in stream {}
+        let req = mock.capturedStreamRequests.first
+        XCTAssertNotNil(req)
+        XCTAssertTrue(try XCTUnwrap(req).mergeStderr, "streamLogs should set mergeStderr to true")
+    }
+
     func testStreamLogsHandlesChunkedData() async throws {
         let part1 = "2026-01-15T10:30:00.000Z First"
         let part2 = " line\n2026-01-15T10:30:01.000Z Second line\n"

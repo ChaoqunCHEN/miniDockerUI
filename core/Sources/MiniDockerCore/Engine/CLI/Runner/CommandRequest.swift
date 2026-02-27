@@ -23,17 +23,28 @@ public struct CommandRequest: Sendable, Codable, Equatable {
     /// and ``CoreError/processTimeout(executablePath:timeoutSeconds:)`` is thrown.
     public let timeoutSeconds: Double?
 
+    /// When `true`, the child process's stderr is redirected into the same
+    /// pipe as stdout so both streams are yielded together by ``CLICommandRunner/stream(_:)``.
+    /// Useful for commands like `docker logs` where container stderr output
+    /// should be visible alongside stdout.  Default is `false`.
+    ///
+    /// > Note: This flag only affects ``CLICommandRunner/stream(_:)``. The
+    /// > ``CLICommandRunner/run(_:)`` method always captures stderr separately.
+    public let mergeStderr: Bool
+
     public init(
         executablePath: String,
         arguments: [String] = [],
         environment: [String: String]? = nil,
         workingDirectory: String? = nil,
-        timeoutSeconds: Double? = nil
+        timeoutSeconds: Double? = nil,
+        mergeStderr: Bool = false
     ) {
         self.executablePath = executablePath
         self.arguments = arguments
         self.environment = environment
         self.workingDirectory = workingDirectory
         self.timeoutSeconds = timeoutSeconds
+        self.mergeStderr = mergeStderr
     }
 }
