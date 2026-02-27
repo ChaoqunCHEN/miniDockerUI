@@ -6,31 +6,10 @@ struct ContainerListView: View {
 
     var body: some View {
         List(selection: $viewModel.selectedContainerId) {
-            let groups = ContainerGrouper.group(
-                containers: viewModel.containers,
-                favoriteKeys: viewModel.favoriteKeys,
-                keyForContainer: { viewModel.containerKey(for: $0) }
-            )
-            ForEach(groups, id: \.title) { group in
+            ForEach(containerGroups, id: \.title) { group in
                 Section(group.title) {
                     ForEach(group.containers, id: \.id) { container in
-                        ContainerRowView(
-                            container: container,
-                            isFavorite: viewModel.isFavorite(container),
-                            isActionInProgress: viewModel.actionInProgress[container.id] != nil,
-                            onToggleFavorite: { viewModel.toggleFavorite(for: container) }
-                        )
-                        .tag(container.id)
-                        .contextMenu {
-                            ContainerContextMenu(
-                                container: container,
-                                isFavorite: viewModel.isFavorite(container),
-                                onStart: { Task { await viewModel.startContainer(id: container.id) } },
-                                onStop: { Task { await viewModel.stopContainer(id: container.id) } },
-                                onRestart: { Task { await viewModel.restartContainer(id: container.id) } },
-                                onToggleFavorite: { viewModel.toggleFavorite(for: container) }
-                            )
-                        }
+                        containerRow(for: container)
                     }
                 }
             }
@@ -42,7 +21,7 @@ struct ContainerListView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    Task { await viewModel.loadContainers() }
+                    Task { await viewModel.refreshAndReconnect() }
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
@@ -58,6 +37,34 @@ struct ContainerListView: View {
                     description: Text("No Docker containers found.")
                 )
             }
+        }
+    }
+
+    private var containerGroups: [ContainerGroup] {
+        ContainerGrouper.group(
+            containers: viewModel.containers,
+            favoriteKeys: viewModel.favoriteKeys,
+            keyForContainer: { viewModel.containerKey(for: $0) }
+        )
+    }
+
+    private func containerRow(for container: ContainerSummary) -> some View {
+        ContainerRowView(
+            container: container,
+            isFavorite: viewModel.isFavorite(container),
+            isActionInProgress: viewModel.actionInProgress[container.id] != nil,
+            onToggleFavorite: { viewModel.toggleFavorite(for: container) }
+        )
+        .tag(container.id)
+        .contextMenu {
+            ContainerContextMenu(
+                container: container,
+                isFavorite: viewModel.isFavorite(container),
+                onStart: { Task { await viewModel.startContainer(id: container.id) } },
+                onStop: { Task { await viewModel.stopContainer(id: container.id) } },
+                onRestart: { Task { await viewModel.restartContainer(id: container.id) } },
+                onToggleFavorite: { viewModel.toggleFavorite(for: container) }
+            )
         }
     }
 }
