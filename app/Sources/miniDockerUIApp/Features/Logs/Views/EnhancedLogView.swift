@@ -5,6 +5,8 @@ struct EnhancedLogView: View {
     let detailViewModel: ContainerDetailViewModel
     @Binding var isSearchVisible: Bool
     @State private var searchViewModel: LogSearchViewModel
+    @State private var isAtBottom: Bool = true
+    @State private var scrollToBottomTrigger: Int = 0
 
     init(detailViewModel: ContainerDetailViewModel, isSearchVisible: Binding<Bool>) {
         self.detailViewModel = detailViewModel
@@ -39,14 +41,34 @@ struct EnhancedLogView: View {
     // MARK: - Log Content
 
     private var logContent: some View {
-        SelectableLogTextView(
-            displayEntries: detailViewModel.displayEntries,
-            searchResults: searchViewModel.results,
-            selectedResultIndex: searchViewModel.selectedResultIndex,
-            onMatchSelected: { matchIndex in
-                searchViewModel.selectedResultIndex = matchIndex
+        ZStack(alignment: .bottomTrailing) {
+            SelectableLogTextView(
+                displayEntries: detailViewModel.displayEntries,
+                searchResults: searchViewModel.results,
+                selectedResultIndex: searchViewModel.selectedResultIndex,
+                onMatchSelected: { matchIndex in
+                    searchViewModel.selectedResultIndex = matchIndex
+                },
+                onIsAtBottomChanged: { self.isAtBottom = $0 },
+                scrollToBottomTrigger: scrollToBottomTrigger
+            )
+
+            if !isAtBottom {
+                Button {
+                    scrollToBottomTrigger += 1
+                } label: {
+                    Image(systemName: "arrow.down.to.line")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 28, height: 28)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .padding(12)
+                .transition(.opacity)
             }
-        )
+        }
+        .animation(.easeInOut(duration: 0.2), value: isAtBottom)
     }
 
     // MARK: - Status Bar
