@@ -83,33 +83,39 @@ final class ScrollbarMarkerOverlay: NSView {
     // MARK: - Mouse Handling
 
     override func mouseDown(with event: NSEvent) {
-        guard !matchPositions.isEmpty else {
+        guard !matchPositions.isEmpty, bounds.height > 0 else {
             super.mouseDown(with: event)
             return
         }
 
+        // isFlipped = true, so localPoint.y increases downward.
         let localPoint = convert(event.locationInWindow, from: nil)
-        // isFlipped = true, so localPoint.y increases downward
         let clickProportion = localPoint.y / bounds.height
 
-        // Find nearest match
-        var nearestIndex = 0
-        var nearestDistance: CGFloat = .greatestFiniteMagnitude
+        let (nearestIndex, nearestDistance) = nearestMatch(to: clickProportion)
 
-        for (index, position) in matchPositions.enumerated() {
-            let distance = abs(position - clickProportion)
-            if distance < nearestDistance {
-                nearestDistance = distance
-                nearestIndex = index
-            }
-        }
-
-        // Only trigger if click is within ~20px of a marker
-        let pixelThreshold: CGFloat = 20 / max(bounds.height, 1)
+        // Only trigger if click is within ~20px of a marker.
+        let pixelThreshold: CGFloat = 20 / bounds.height
         if nearestDistance <= pixelThreshold {
             onMatchSelected?(nearestIndex)
         } else {
             super.mouseDown(with: event)
         }
+    }
+
+    /// Find the match position closest to a given proportional value.
+    private func nearestMatch(to proportion: CGFloat) -> (index: Int, distance: CGFloat) {
+        var bestIndex = 0
+        var bestDistance: CGFloat = .greatestFiniteMagnitude
+
+        for (index, position) in matchPositions.enumerated() {
+            let distance = abs(position - proportion)
+            if distance < bestDistance {
+                bestDistance = distance
+                bestIndex = index
+            }
+        }
+
+        return (bestIndex, bestDistance)
     }
 }

@@ -9,22 +9,37 @@ struct SelectableLogTextView: NSViewRepresentable {
     let searchResults: [LogSearchResult]
     let selectedResultIndex: Int?
     var onMatchSelected: ((Int) -> Void)?
+    var onIsAtBottomChanged: ((Bool) -> Void)?
+    /// Incremented to trigger a scroll-to-bottom action.
+    var scrollToBottomTrigger: Int = 0
 
     // MARK: - Coordinator
 
     final class Coordinator: NSObject {
+        // MARK: Rendered Content State
+
         /// Number of entries currently rendered in the text storage.
         var renderedEntryCount: Int = 0
 
         /// Character offset where each entry starts. Length = renderedEntryCount + 1.
         var entryOffsets: [Int] = [0]
 
-        /// Whether the user is scrolled to the bottom.
-        var isAtBottom: Bool = true
-
         /// Identity of the first rendered entry for append-vs-rebuild detection.
         var firstEntryTimestamp: Date?
         var firstEntryMessage: String?
+
+        // MARK: Scroll State
+
+        /// Whether the user is scrolled to the bottom.
+        var isAtBottom: Bool = true
+
+        /// Tracks the last value of `scrollToBottomTrigger` to detect changes.
+        var lastScrollToBottomTrigger: Int = 0
+
+        /// Callback fired when the scroll position crosses the "at bottom" threshold.
+        var onIsAtBottomChanged: ((Bool) -> Void)?
+
+        // MARK: Search Highlight Cache
 
         /// Previous search highlight state to avoid redundant work.
         var lastHighlightedResultCount: Int = 0
@@ -35,14 +50,46 @@ struct SelectableLogTextView: NSViewRepresentable {
         var cachedEntryLookup: [EntryKey: Int] = [:]
         var cachedEntryLookupCount: Int = 0
 
-        func resetHighlightState() {
-            lastHighlightedResultCount = 0
-            lastHighlightedSelectedIndex = nil
-            lastRenderedCountForHighlights = 0
-        }
+        // MARK: Scrollbar Marker State
 
         /// The overlay view that draws match markers on the scrollbar track.
         var markerOverlay: ScrollbarMarkerOverlay?
+
+        /// Handler forwarded to the overlay's `onMatchSelected`; set once in `makeNSView`
+        /// and refreshed in `updateNSView`, avoiding per-cycle closure allocations on the overlay.
+        var markerOverlayMatchHandler: ((Int) -> Void)?
+
+        /// Cached marker positions to avoid O(N) layout queries per update cycle.
+        var lastMarkerSearchResultCount: Int = 0
+        var lastMarkerRenderedEntryCount: Int = 0
+
+        /// Last overlay frame to avoid unnecessary AppKit frame assignments.
+        var lastOverlayFrame: NSRect = .zero
+
+        // MARK: Cache Invalidation
+
+        /// Invalidate all search-related caches. Called when the rendered
+        /// content changes (full rebuild or clear) so highlights and markers
+        /// are recomputed on the next update cycle.
+        func invalidateSearchCaches() {
+            lastHighlightedResultCount = 0
+            lastHighlightedSelectedIndex = nil
+            lastRenderedCountForHighlights = 0
+            lastMarkerSearchResultCount = 0
+            lastMarkerRenderedEntryCount = 0
+        }
+
+        /// Reset all content-related state back to the empty state.
+        func resetContentState() {
+            renderedEntryCount = 0
+            entryOffsets = [0]
+            firstEntryTimestamp = nil
+            firstEntryMessage = nil
+            cachedEntryLookupCount = 0
+            invalidateSearchCaches()
+        }
+
+        // MARK: Scroll Observation
 
         @MainActor @objc func boundsDidChange(_ notification: Notification) {
             guard let clipView = notification.object as? NSClipView,
@@ -52,7 +99,12 @@ struct SelectableLogTextView: NSViewRepresentable {
 
             let viewportMaxY = clipView.bounds.maxY
             let documentHeight = documentView.frame.height
-            isAtBottom = viewportMaxY >= documentHeight - 20
+            let newIsAtBottom = viewportMaxY >= documentHeight - 20
+
+            if newIsAtBottom != isAtBottom {
+                isAtBottom = newIsAtBottom
+                onIsAtBottomChanged?(newIsAtBottom)
+            }
         }
     }
 
@@ -70,7 +122,7 @@ struct SelectableLogTextView: NSViewRepresentable {
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
 
-        let textView = NSTextView()
+        let textView = ArrowCursorTextView()
         textView.isEditable = false
         textView.isSelectable = true
         textView.isRichText = true
@@ -98,23 +150,35 @@ struct SelectableLogTextView: NSViewRepresentable {
         )
 
         scrollView.documentView = textView
+        scrollView.documentCursor = NSCursor.arrow
+
+        // Wire callback before registering the observer so it is never nil
+        // when boundsDidChange fires.
+        let coordinator = context.coordinator
+        coordinator.onIsAtBottomChanged = onIsAtBottomChanged
+
+        // Wire onMatchSelected through the coordinator once (not per-update).
+        coordinator.markerOverlayMatchHandler = onMatchSelected
 
         // Observe scroll position
         let clipView = scrollView.contentView
         clipView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(
-            context.coordinator,
+            coordinator,
             selector: #selector(Coordinator.boundsDidChange(_:)),
             name: NSView.boundsDidChangeNotification,
             object: clipView
         )
 
-        // Create scrollbar marker overlay (pinned to right edge)
+        // Create scrollbar marker overlay. Frame is set in updateScrollbarMarkers
+        // to align with the scroller's knobSlot.
         let overlay = ScrollbarMarkerOverlay(frame: .zero)
         overlay.isHidden = true
-        overlay.autoresizingMask = [.height, .minXMargin]
+        overlay.onMatchSelected = { [weak coordinator] matchIndex in
+            coordinator?.markerOverlayMatchHandler?(matchIndex)
+        }
         scrollView.addSubview(overlay)
-        context.coordinator.markerOverlay = overlay
+        coordinator.markerOverlay = overlay
 
         return scrollView
     }
@@ -133,6 +197,9 @@ struct SelectableLogTextView: NSViewRepresentable {
         else { return }
 
         let coordinator = context.coordinator
+        coordinator.onIsAtBottomChanged = onIsAtBottomChanged
+        coordinator.markerOverlayMatchHandler = onMatchSelected
+
         let wasAtBottom = coordinator.isAtBottom
         let previousSelectedIndex = coordinator.lastHighlightedSelectedIndex
 
@@ -142,20 +209,47 @@ struct SelectableLogTextView: NSViewRepresentable {
 
         applySearchHighlights(textView: textView, coordinator: coordinator, entryLookup: entryLookup)
 
+        updateScrollPosition(
+            textView: textView,
+            coordinator: coordinator,
+            wasAtBottom: wasAtBottom,
+            hasSelectedMatch: selectedResultIndex != nil
+        )
+
         let matchSelectionChanged = selectedResultIndex != previousSelectedIndex
-        let hasSelectedMatch = selectedResultIndex != nil
-
-        // Auto-scroll to bottom only when no match is actively selected
-        if wasAtBottom, coordinator.renderedEntryCount > 0, !hasSelectedMatch {
-            textView.scrollToEndOfDocument(nil)
-            coordinator.isAtBottom = true
-        }
-
         if matchSelectionChanged {
             scrollToSelectedMatch(textView: textView, coordinator: coordinator, entryLookup: entryLookup)
         }
 
         updateScrollbarMarkers(scrollView: scrollView, coordinator: coordinator, entryLookup: entryLookup)
+    }
+
+    // MARK: - Scroll Position
+
+    /// Handle explicit scroll-to-bottom triggers and auto-scroll when already at the bottom.
+    private func updateScrollPosition(
+        textView: NSTextView,
+        coordinator: Coordinator,
+        wasAtBottom: Bool,
+        hasSelectedMatch: Bool
+    ) {
+        let triggerFired = scrollToBottomTrigger != coordinator.lastScrollToBottomTrigger
+
+        if triggerFired {
+            coordinator.lastScrollToBottomTrigger = scrollToBottomTrigger
+            textView.scrollToEndOfDocument(nil)
+            if !coordinator.isAtBottom {
+                coordinator.isAtBottom = true
+                // Defer @State mutation to avoid modifying state during the view update.
+                DispatchQueue.main.async {
+                    coordinator.onIsAtBottomChanged?(true)
+                }
+            }
+        } else if wasAtBottom, coordinator.renderedEntryCount > 0, !hasSelectedMatch {
+            // Auto-scroll to bottom only when no match is actively selected.
+            textView.scrollToEndOfDocument(nil)
+            coordinator.isAtBottom = true
+        }
     }
 
     // MARK: - Text Content
@@ -166,58 +260,65 @@ struct SelectableLogTextView: NSViewRepresentable {
     ) {
         let newCount = displayEntries.count
 
+        // Clear all content when there are no entries to display.
         if newCount == 0 {
             if coordinator.renderedEntryCount > 0 {
                 textStorage.setAttributedString(NSAttributedString())
-                coordinator.renderedEntryCount = 0
-                coordinator.entryOffsets = [0]
-                coordinator.firstEntryTimestamp = nil
-                coordinator.firstEntryMessage = nil
-                coordinator.cachedEntryLookupCount = 0
-                coordinator.resetHighlightState()
+                coordinator.resetContentState()
             }
             return
         }
 
-        // Detect append-only vs full rebuild
+        // Detect whether new entries were appended to an unchanged prefix.
         let isAppendOnly = coordinator.renderedEntryCount > 0
             && newCount >= coordinator.renderedEntryCount
             && displayEntries[0].timestamp == coordinator.firstEntryTimestamp
             && displayEntries[0].message == coordinator.firstEntryMessage
 
+        // Nothing new -- skip entirely.
         if isAppendOnly, newCount == coordinator.renderedEntryCount {
             return
         }
 
         if isAppendOnly {
-            let startIndex = coordinator.renderedEntryCount
-            let newEntries = displayEntries[startIndex ..< newCount]
-            var offsets = coordinator.entryOffsets
-            let newAttrString = Self.buildAttributedString(
-                for: newEntries,
-                entryOffsets: &offsets
-            )
-            textStorage.beginEditing()
-            textStorage.append(newAttrString)
-            textStorage.endEditing()
-            coordinator.entryOffsets = offsets
+            appendNewEntries(textStorage: textStorage, coordinator: coordinator, from: coordinator.renderedEntryCount)
         } else {
-            var offsets = [0]
-            let attrString = Self.buildAttributedString(
-                for: displayEntries[...],
-                entryOffsets: &offsets
-            )
-            textStorage.beginEditing()
-            textStorage.setAttributedString(attrString)
-            textStorage.endEditing()
-            coordinator.entryOffsets = offsets
-            coordinator.firstEntryTimestamp = displayEntries[0].timestamp
-            coordinator.firstEntryMessage = displayEntries[0].message
-            coordinator.cachedEntryLookupCount = 0
-            coordinator.resetHighlightState()
+            rebuildAllEntries(textStorage: textStorage, coordinator: coordinator)
         }
 
         coordinator.renderedEntryCount = newCount
+    }
+
+    /// Append entries starting at `startIndex` to existing text storage.
+    private func appendNewEntries(
+        textStorage: NSTextStorage,
+        coordinator: Coordinator,
+        from startIndex: Int
+    ) {
+        let newEntries = displayEntries[startIndex ..< displayEntries.count]
+        var offsets = coordinator.entryOffsets
+        let attrString = Self.buildAttributedString(for: newEntries, entryOffsets: &offsets)
+        textStorage.beginEditing()
+        textStorage.append(attrString)
+        textStorage.endEditing()
+        coordinator.entryOffsets = offsets
+    }
+
+    /// Replace the entire text storage with a fresh render of all entries.
+    private func rebuildAllEntries(
+        textStorage: NSTextStorage,
+        coordinator: Coordinator
+    ) {
+        var offsets = [0]
+        let attrString = Self.buildAttributedString(for: displayEntries[...], entryOffsets: &offsets)
+        textStorage.beginEditing()
+        textStorage.setAttributedString(attrString)
+        textStorage.endEditing()
+        coordinator.entryOffsets = offsets
+        coordinator.firstEntryTimestamp = displayEntries[0].timestamp
+        coordinator.firstEntryMessage = displayEntries[0].message
+        coordinator.cachedEntryLookupCount = 0
+        coordinator.invalidateSearchCaches()
     }
 
     // MARK: - Attributed String Building
@@ -515,26 +616,9 @@ struct SelectableLogTextView: NSViewRepresentable {
     ) {
         guard let overlay = coordinator.markerOverlay else { return }
 
-        // Align the overlay with the vertical scroller
-        if let scroller = scrollView.verticalScroller {
-            let scrollerFrame = scroller.frame
-            overlay.frame = NSRect(
-                x: scrollerFrame.origin.x,
-                y: 0,
-                width: Self.markerOverlayWidth,
-                height: scrollerFrame.height
-            )
-        } else {
-            let svBounds = scrollView.bounds
-            overlay.frame = NSRect(
-                x: svBounds.width - Self.markerOverlayWidth,
-                y: 0,
-                width: Self.markerOverlayWidth,
-                height: svBounds.height
-            )
-        }
+        updateOverlayFrame(overlay: overlay, scrollView: scrollView, coordinator: coordinator)
 
-        // Hide when no search results
+        // Hide when no search results.
         guard !searchResults.isEmpty else {
             if !overlay.isHidden {
                 overlay.isHidden = true
@@ -546,14 +630,73 @@ struct SelectableLogTextView: NSViewRepresentable {
 
         overlay.isHidden = false
 
-        let totalLength = coordinator.entryOffsets.last ?? 0
-        guard totalLength > 0 else {
-            overlay.matchPositions = []
-            overlay.selectedMatchIndex = nil
-            return
+        // Only recompute positions when search results or entries changed.
+        let needsPositionUpdate = searchResults.count != coordinator.lastMarkerSearchResultCount
+            || coordinator.renderedEntryCount != coordinator.lastMarkerRenderedEntryCount
+
+        if needsPositionUpdate {
+            let positions = computeMarkerPositions(
+                scrollView: scrollView, coordinator: coordinator, entryLookup: entryLookup
+            )
+            overlay.matchPositions = positions
+            coordinator.lastMarkerSearchResultCount = searchResults.count
+            coordinator.lastMarkerRenderedEntryCount = coordinator.renderedEntryCount
         }
 
-        let totalLengthFloat = CGFloat(totalLength)
+        overlay.selectedMatchIndex = selectedResultIndex
+    }
+
+    /// Compute the overlay frame aligned with the scroller's knobSlot.
+    /// Using the full scroll-view bounds causes markers to drift from the
+    /// thumb -- the knobSlot is inset by ~3 px on each end for legacy
+    /// scrollers, producing visible misalignment at extremes.
+    private func updateOverlayFrame(
+        overlay: ScrollbarMarkerOverlay,
+        scrollView: NSScrollView,
+        coordinator: Coordinator
+    ) {
+        let newFrame: NSRect
+        if let scroller = scrollView.verticalScroller, scroller.knobProportion > 0 {
+            let scrollerFrame = scroller.frame
+            let knobSlot = scroller.rect(for: .knobSlot)
+            newFrame = NSRect(
+                x: scrollerFrame.origin.x,
+                y: scrollerFrame.origin.y + knobSlot.origin.y,
+                width: Self.markerOverlayWidth,
+                height: knobSlot.height
+            )
+        } else {
+            let svBounds = scrollView.bounds
+            newFrame = NSRect(
+                x: svBounds.width - Self.markerOverlayWidth,
+                y: 0,
+                width: Self.markerOverlayWidth,
+                height: svBounds.height
+            )
+        }
+
+        if newFrame != coordinator.lastOverlayFrame {
+            overlay.frame = newFrame
+            coordinator.lastOverlayFrame = newFrame
+        }
+    }
+
+    /// Compute proportional Y positions (0..1) for each search result using the layout manager.
+    private func computeMarkerPositions(
+        scrollView: NSScrollView,
+        coordinator: Coordinator,
+        entryLookup: [EntryKey: Int]
+    ) -> [CGFloat] {
+        guard let textView = scrollView.documentView as? NSTextView,
+              let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer
+        else { return [] }
+
+        let documentHeight = textView.frame.height
+        let textLength = textView.textStorage?.length ?? 0
+        guard documentHeight > 0, textLength > 0 else { return [] }
+
+        let insetTop = textView.textContainerInset.height
         var positions: [CGFloat] = []
         positions.reserveCapacity(searchResults.count)
 
@@ -565,16 +708,22 @@ struct SelectableLogTextView: NSViewRepresentable {
                 continue
             }
 
-            let proportion = CGFloat(coordinator.entryOffsets[entryIdx]) / totalLengthFloat
+            let charOffset = coordinator.entryOffsets[entryIdx]
+            guard charOffset < textLength else {
+                positions.append(1.0)
+                continue
+            }
+
+            let glyphRange = layoutManager.glyphRange(
+                forCharacterRange: NSRange(location: charOffset, length: 1),
+                actualCharacterRange: nil
+            )
+            let rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+            let proportion = (insetTop + rect.origin.y) / documentHeight
             positions.append(min(max(proportion, 0), 1))
         }
 
-        overlay.matchPositions = positions
-        overlay.selectedMatchIndex = selectedResultIndex
-
-        overlay.onMatchSelected = { [onMatchSelected] matchIndex in
-            onMatchSelected?(matchIndex)
-        }
+        return positions
     }
 
     // MARK: - Scroll to Selected Match
@@ -616,5 +765,53 @@ struct SelectableLogTextView: NSViewRepresentable {
             timestamp = entry.timestamp
             message = entry.message
         }
+    }
+}
+
+// MARK: - Arrow Cursor Text View
+
+/// NSTextView subclass that shows an arrow cursor instead of the I-beam,
+/// since the log view is read-only.
+///
+/// NSTextView installs internal tracking areas (potentially with private
+/// owner objects) that set the I-beam cursor through `mouseMoved:`.
+/// We remove ALL tracking areas after super and install a single one owned
+/// by self. This is safe because the view is non-editable (no IME needed)
+/// and non-interactive beyond text selection.
+private class ArrowCursorTextView: NSTextView {
+    /// Reused tracking area — `.inVisibleRect` means the rect parameter is
+    /// ignored, so the same instance works across all `updateTrackingAreas` calls.
+    private lazy var arrowTrackingArea: NSTrackingArea = .init(
+        rect: .zero,
+        options: [.mouseMoved, .cursorUpdate, .mouseEnteredAndExited,
+                  .activeInKeyWindow, .inVisibleRect],
+        owner: self,
+        userInfo: nil
+    )
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        // Remove ALL tracking areas — including NSTextView's internal ones
+        // that set the I-beam cursor via private helper objects.
+        for area in trackingAreas {
+            removeTrackingArea(area)
+        }
+        addTrackingArea(arrowTrackingArea)
+    }
+
+    override func mouseMoved(with _: NSEvent) {
+        NSCursor.arrow.set()
+    }
+
+    override func mouseEntered(with _: NSEvent) {
+        NSCursor.arrow.set()
+    }
+
+    override func cursorUpdate(with _: NSEvent) {
+        NSCursor.arrow.set()
+    }
+
+    override func resetCursorRects() {
+        addCursorRect(visibleRect, cursor: .arrow)
     }
 }
